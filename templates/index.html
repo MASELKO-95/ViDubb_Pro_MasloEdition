@@ -1,0 +1,1816 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🎬 ViDubb Pro MasloEdition</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg:        #08090f;
+      --bg2:       #0d0e16;
+      --bg3:       #151724;
+      --panel:     rgba(255,255,255,0.03);
+      --panel-hover: rgba(255,255,255,0.06);
+      --border:    rgba(255,255,255,0.07);
+      --accent:    #6366f1;
+      --accent-gradient: linear-gradient(135deg, #6366f1, #a855f7);
+      --green:     #10b981;
+      --red:       #f43f5e;
+      --yellow:    #fbbf24;
+      --text:      #f1f5f9;
+      --muted:     #64748b;
+      --radius:    14px;
+      --shadow:    0 10px 30px rgba(0,0,0,0.6);
+      --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
+
+
+    .topbar{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:0 24px;height:64px;background:var(--bg2);
+      border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;
+      backdrop-filter: blur(10px);
+    }
+    .topbar .logo{font-size:1.3rem;font-weight:700;letter-spacing:.5px;
+      background: var(--accent-gradient);
+      -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+    .topbar .actions{display:flex;gap:10px;align-items:center;}
+
+    /* ─── OLLAMA STATUS ─── */
+    .ollama-badge{
+      display:flex;align-items:center;gap:8px;
+      padding:8px 16px;border-radius:999px;font-size:.8rem;font-weight:500;
+      border:1px solid var(--border);background:var(--panel);cursor:pointer;
+      transition: var(--transition);
+    }
+    .ollama-badge:hover{background:var(--panel-hover); border-color: var(--accent);}
+    .ollama-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;
+      background:var(--muted);transition:background .3s;}
+    .ollama-dot.ok{background:var(--green);box-shadow:0 0 8px var(--green);}
+    .ollama-dot.err{background:var(--red);box-shadow:0 0 8px var(--red);}
+
+    /* ─── LAYOUT ─── */
+    .main{display:grid;grid-template-columns:1fr 360px;gap:0;height:calc(100vh - 64px);}
+    .left{display:flex;flex-direction:column;overflow:hidden;border-right:1px solid var(--border);}
+    .right{display:flex;flex-direction:column;overflow:hidden;background:var(--bg2);}
+
+    /* ─── VIDEO AREA ─── */
+    .video-wrap{
+      position:relative;background:#000;flex:0 0 auto;
+      display:flex;align-items:center;justify-content:center;height:340px;
+      border-bottom: 1px solid var(--border);
+    }
+    #video-player{width:100%;height:100%;object-fit:contain;display:none;}
+    .video-placeholder{
+      display:flex;flex-direction:column;align-items:center;gap:12px;color:var(--muted);
+    }
+    .video-placeholder svg{opacity:.3; color: var(--accent);}
+    .video-placeholder p{font-size:.9rem; font-weight: 500;}
+
+    /* ─── FILE DROP ZONE ─── */
+    .drop-zone{
+      border:2px dashed var(--border);border-radius:var(--radius);
+      padding:24px 14px;text-align:center;cursor:pointer;
+      transition: var(--transition);position:relative;
+      background: rgba(255, 255, 255, 0.01);
+    }
+    .drop-zone:hover,.drop-zone.dragover{
+      border-color:var(--accent);background:rgba(99,102,241,.05);
+    }
+    .drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+    .drop-zone .dz-icon{font-size:2.2rem;margin-bottom:6px; transition: transform 0.2s;}
+    .drop-zone:hover .dz-icon{transform: scale(1.1);}
+    .drop-zone .dz-text{font-size:.8rem;color:var(--muted);}
+    .drop-zone .dz-filename{font-size:.78rem;color:var(--accent);margin-top:4px;font-weight:500;word-break:break-all;}
+    .upload-progress{
+      height:4px;border-radius:4px;background:var(--border);margin-top:8px;overflow:hidden;display:none;
+    }
+    .upload-progress-fill{
+      height:100%;border-radius:4px;background:var(--accent-gradient);
+      width:0%;transition:width .3s;
+    }
+
+    /* ─── WAVEFORM ─── */
+    .waveform{height:48px;background:var(--bg3);display:flex;align-items:flex-end;
+      gap:2px;padding:2px 8px;flex-shrink:0;border-bottom: 1px solid var(--border);}
+    .wbar{flex:1;border-radius:3px 3px 0 0;background:var(--accent-gradient);opacity:.4;
+      animation:wave 1.5s ease-in-out infinite alternate;}
+    @keyframes wave{0%{opacity:.2}100%{opacity:.6}}
+
+    /* ─── SUBTITLE TABLE AREA ─── */
+    .sub-header{display:flex;align-items:center;justify-content:space-between;
+      padding:12px 18px;border-bottom:1px solid var(--border);flex-shrink:0; background: var(--bg2);}
+    .sub-header h3{font-size:.95rem;font-weight:600;color:var(--text);display: flex; align-items: center; gap: 8px;}
+    .sub-toolbar{display:flex;gap:6px;}
+
+    .sub-scroll{flex:1;overflow-y:auto;background: var(--bg);}
+    table{width:100%;border-collapse:collapse;font-size:.82rem;}
+    thead th{
+      position:sticky;top:0;background:var(--bg3);padding:10px 12px;
+      text-align:left;font-weight:600;color:var(--muted);text-transform:uppercase;
+      font-size:.72rem;letter-spacing:.8px;border-bottom:1px solid var(--border);z-index:2;
+    }
+    tbody tr{cursor:pointer;border-bottom:1px solid rgba(255,255,255,0.02);transition: var(--transition);}
+    tbody tr:hover{background:rgba(99,102,241,.06);}
+    tbody tr.selected{background:rgba(99,102,241,.14); border-left: 3px solid var(--accent);}
+    tbody td{padding:10px 12px;vertical-align:top;max-width:220px;word-break:break-word;}
+    .badge-edited{display:inline-block;padding:2px 6px;border-radius:4px;
+      font-size:.65rem;background:rgba(99,102,241,.2);color:#a5b4fc;font-weight: 500;}
+    .badge-approved{display:inline-block;padding:2px 7px;border-radius:4px;
+      font-size:.7rem;background:rgba(16,185,129,.18);color:#6ee7b7;font-weight:600;cursor:pointer;transition:all 0.15s;}
+    .badge-approved:hover{background:rgba(16,185,129,.35);}
+    .badge-pending{display:inline-block;padding:2px 7px;border-radius:4px;
+      font-size:.7rem;background:rgba(251,191,36,.12);color:#fbbf24;font-weight:600;cursor:pointer;transition:all 0.15s;}
+    .badge-pending:hover{background:rgba(251,191,36,.28);}
+    .badge-rejected{display:inline-block;padding:2px 7px;border-radius:4px;
+      font-size:.7rem;background:rgba(244,63,94,.15);color:#fb7185;font-weight:600;cursor:pointer;transition:all 0.15s;}
+    .badge-rejected:hover{background:rgba(244,63,94,.3);}
+    .conf-bar{height:4px;border-radius:2px;background:var(--border);margin-top:4px;}
+    .conf-fill{height:100%;border-radius:2px;background:var(--green);}
+
+    /* ─── RIGHT PANELS ─── */
+    .right-scroll{flex:1;overflow-y:auto;padding:16px;}
+    .panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+      padding:16px;margin-bottom:16px; transition: border-color 0.2s;}
+    .panel:hover{border-color: rgba(255,255,255,0.12);}
+    .panel h4{font-size:.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.8px;
+      color:var(--muted);margin-bottom:12px; border-left: 3px solid var(--accent); padding-left: 8px;}
+    label{display:block;font-size:.78rem;color:var(--muted);margin-bottom:4px;margin-top:10px;font-weight: 500;}
+    label:first-child{margin-top:0;}
+    input,select,textarea{
+      width:100%;background:rgba(0,0,0,.4);border:1px solid var(--border);
+      border-radius:8px;padding:10px 12px;color:var(--text);font-size:.85rem;
+      font-family:'Outfit',sans-serif;outline:none;transition: var(--transition);
+    }
+    input:focus,select:focus,textarea:focus{border-color:var(--accent); background: rgba(0,0,0,.6);}
+    select option{background:var(--bg2);}
+    textarea{resize:vertical;line-height:1.5;}
+
+    #prompt-textarea{
+      min-height:90px;max-height:120px;
+      overflow-y:auto;
+    }
+
+    .btn{
+      display:inline-flex;align-items:center;justify-content:center;gap:8px;
+      padding:10px 16px;border-radius:8px;font-size:.85rem;font-weight:600;
+      cursor:pointer;border:none;transition: var(--transition);white-space:nowrap;
+    }
+    .btn-primary{background:var(--accent-gradient);color:#fff;}
+    .btn-primary:hover{opacity:.95;transform:translateY(-1px);box-shadow:0 6px 20px rgba(99,102,241,.3);}
+    .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text);}
+    .btn-ghost:hover{background:rgba(255,255,255,.05); border-color: rgba(255,255,255,0.2);}
+    .btn-danger{background:rgba(244,63,94,.15);border:1px solid rgba(244,63,94,.25);color:var(--red);}
+    .btn-danger:hover{background:rgba(244,63,94,.25);}
+    .btn-sm{padding:6px 12px;font-size:.78rem;}
+    .row{display:flex;gap:10px;flex-wrap:wrap;}
+    .row .btn{flex:1;}
+
+    /* Progress / status bar */
+    .status-bar{
+      padding:10px 18px;border-top:1px solid var(--border);
+      font-size:.8rem;color:var(--muted);font-family:'JetBrains Mono',monospace;
+      flex-shrink:0;background:var(--bg2); display: flex; justify-content: space-between; align-items: center;
+    }
+    .status-bar.busy{color:var(--yellow);}
+    .status-bar.ok{color:var(--green);}
+
+    /* ─── OLLAMA LOG PANEL ─── */
+    .log-panel{
+      position:fixed;bottom:0;right:0;width:500px;
+      background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius) var(--radius) 0 0;
+      box-shadow:var(--shadow);z-index:200;transform:translateY(calc(100% - 40px));
+      transition:transform .3s cubic-bezier(.4,0,.2,1);
+    }
+    .log-panel.open{transform:translateY(0);}
+    .log-header{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:10px 16px;cursor:pointer;border-bottom:1px solid transparent;
+    }
+    .log-panel.open .log-header{border-color:var(--border);}
+    .log-title{font-size:.85rem;font-weight:600;display:flex;align-items:center;gap:8px;}
+    .log-body{
+      height:280px;overflow-y:auto;padding:12px;
+      font-family:'JetBrains Mono',monospace;font-size:.78rem;line-height:1.6;
+      background: rgba(0,0,0,0.2);
+    }
+    .log-line{padding:2px 0;color:var(--muted);word-break:break-all;}
+    .log-line.ok{color:var(--green);}
+    .log-line.err{color:var(--red);}
+    .log-line.warn{color:var(--yellow);}
+    .log-badge{
+      font-size:.7rem;padding:2px 8px;border-radius:999px;
+      background:rgba(99,102,241,.15);color:#c7d2fe;font-family:'Outfit',sans-serif;
+    }
+
+    /* spinner */
+    .spin{
+      display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.2);
+      border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;
+    }
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    /* scrollbar */
+    ::-webkit-scrollbar{width:6px;height:6px;}
+    ::-webkit-scrollbar-track{background:transparent;}
+    ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:3px;}
+    ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.2);}
+
+    /* modals */
+    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;display:none;align-items:center;justify-content:center;backdrop-filter: blur(4px);}
+    .modal-bg.show{display:flex;}
+    .modal{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:28px;width:560px;max-height:85vh;overflow-y:auto;box-shadow: var(--shadow);}
+    .modal h3{margin-bottom:18px;font-size:1.15rem; font-weight: 700; border-bottom: 1px solid var(--border); padding-bottom: 8px;}
+
+    /* Project Manager items */
+    .project-item{
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 16px; background: var(--panel); border: 1px solid var(--border);
+      border-radius: 8px; transition: var(--transition);
+    }
+    .project-item:hover{
+      background: var(--panel-hover); border-color: var(--accent);
+    }
+    .project-details{
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .project-name{
+      font-weight: 600; font-size: 0.9rem; color: var(--text);
+    }
+    .project-date{
+      font-size: 0.72rem; color: var(--muted); font-family: 'JetBrains Mono', monospace;
+    }
+    .project-actions{
+      display: flex; gap: 6px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- LANGUAGE SELECT DIALOG -->
+<div class="modal-bg show" id="lang-modal" style="display:none; z-index: 1000;">
+  <div class="modal" style="text-align: center; max-width: 420px; border-color: var(--accent);">
+    <h3 style="margin-bottom: 20px; font-size: 1.4rem; background: var(--accent-gradient); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;" class="logo">🎬 ViDubb Pro</h3>
+    <p style="margin-bottom: 24px; color: var(--text); font-size: 0.95rem; font-weight: 500;">Wybierz język interfejsu / Select Interface Language</p>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      <button class="btn btn-primary" onclick="chooseLanguage('pl')">Polski (Domyślny)</button>
+      <button class="btn btn-ghost" onclick="chooseLanguage('en')">English</button>
+    </div>
+  </div>
+</div>
+
+<!-- PROJECT MANAGER DIALOG -->
+<div class="modal-bg" id="project-modal" style="display:none; z-index: 900;">
+  <div class="modal" style="max-width: 600px; width: 90%;">
+    <h3 data-i18n="pmTitle">Katalog Projektów</h3>
+    <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+      <input type="text" id="new-project-name" data-i18n-placeholder="pmNamePlaceholder" placeholder="Nazwa nowego projektu..." style="flex: 1;"/>
+      <button class="btn btn-primary" onclick="createNewProject()" data-i18n="pmCreateBtn">Utwórz projekt</button>
+    </div>
+    <div style="border-top: 1px solid var(--border); padding-top: 15px;">
+      <h4 style="font-size: 0.8rem; text-transform: uppercase; color: var(--muted); margin-bottom: 12px;" data-i18n="projectManager">Istniejące projekty</h4>
+      <div id="projects-list-container" style="max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px;">
+        <!-- Filled dynamically -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOP BAR -->
+<header class="topbar" id="topbar">
+  <span class="logo">🎬 ViDubb Pro</span>
+  <div class="actions">
+    <button class="btn btn-ghost btn-sm" onclick="showProjectManager()" data-i18n="projectManager">📁 Projekty</button>
+    <button class="btn btn-danger btn-sm" onclick="resetApp()" data-i18n="resetBtn">🔄 Reset</button>
+    <button class="btn btn-ghost btn-sm" onclick="exportSRT()" data-i18n="exportSrt">💾 Export SRT</button>
+    <button class="btn btn-ghost btn-sm" onclick="downloadVideo()" data-i18n="downloadVideo">📥 Download Video</button>
+    <div class="ollama-badge" onclick="toggleLog()" title="Click to show Ollama logs">
+      <span class="ollama-dot" id="ollama-dot"></span>
+      <span id="ollama-label" data-i18n="ollamaStatus">Ollama: checking…</span>
+    </div>
+  </div>
+</header>
+
+<!-- MAIN GRID -->
+<div class="main">
+
+  <!-- ── LEFT: VIDEO + SUBTITLES ── -->
+  <div class="left">
+
+    <!-- Video -->
+    <div class="video-wrap" id="video-wrap">
+      <video id="video-player" controls></video>
+      <div class="video-placeholder" id="video-placeholder">
+        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+        </svg>
+        <p data-i18n="videoPlaceholder">No video loaded — use the controls on the right</p>
+      </div>
+    </div>
+
+    <!-- Waveform -->
+    <div class="waveform" id="waveform">
+      {% for i in range(95) %}<div class="wbar"></div>{% endfor %}
+    </div>
+
+    <!-- Subtitle table -->
+    <div class="sub-header">
+      <h3>
+        <span data-i18n="subtitlesTitle">📝 Subtitle Tracks</span>
+        <span id="sub-count" style="color:var(--muted);font-weight:400; font-size: 0.85rem;"></span>
+      </h3>
+      <div class="sub-toolbar">
+        <button class="btn btn-ghost btn-sm" onclick="addSubtitle()" title="Add Subtitle">➕</button>
+        <button class="btn btn-ghost btn-sm" onclick="splitSubtitle()" title="Split Subtitle">✂️</button>
+        <button class="btn btn-ghost btn-sm" onclick="mergeSubtitle()" title="Merge Subtitles">🔗</button>
+        <button class="btn btn-ghost btn-sm" onclick="deleteSubtitle()" title="Delete Subtitle">🗑️</button>
+        <div style="width:1px;background:var(--border);margin:0 4px;"></div>
+        <button class="btn btn-ghost btn-sm" onclick="approveAll()" title="Approve All" style="color:var(--green)">✅ All</button>
+        <button class="btn btn-ghost btn-sm" onclick="rejectAll()" title="Reject All" style="color:var(--red)">❌ All</button>
+        <button class="btn btn-ghost btn-sm" onclick="resetApproval()" title="Reset Approval" style="color:var(--yellow)">🔄 Reset</button>
+      </div>
+    </div>
+
+    <div class="sub-scroll">
+      <table id="sub-table">
+        <thead>
+          <tr>
+            <th style="width:40px">#</th>
+            <th style="width:96px">Start</th>
+            <th style="width:96px">End</th>
+            <th>Original</th>
+            <th>Translation</th>
+            <th style="width:80px">Speaker</th>
+            <th style="width:58px">Conf</th>
+            <th style="width:72px" title="Approval status — click badge to toggle">✅ OK</th>
+            <th style="width:56px" title="Ignore — pomija tłumaczenie i dubbing (np. muzyka intro)">🔇</th>
+          </tr>
+        </thead>
+        <tbody id="sub-tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="status-bar" id="status-bar">
+      <span id="status-text" data-i18n="statusReady">Ready.</span>
+      <span id="active-proj-badge" style="font-size:0.75rem; color: var(--accent); font-weight:600; padding: 2px 8px; border-radius: 6px; background: rgba(99,102,241,0.1);"></span>
+    </div>
+  </div>
+
+  <!-- ── RIGHT: CONTROLS ── -->
+  <div class="right">
+    <div class="right-scroll">
+
+      <!-- Load Video -->
+      <div class="panel">
+        <h4 data-i18n="loadPanelTitle">📁 Wczytaj Wideo i Napisy</h4>
+
+        <!-- Drag & Drop wideo -->
+        <div class="drop-zone" id="drop-zone-video">
+          <input type="file" id="file-input-video" accept="video/*,audio/*" onchange="onVideoFileChosen(this)"/>
+          <div class="dz-icon">🎬</div>
+          <div class="dz-text" data-i18n="videoDropzoneText">Przeciągnij wideo tutaj lub <strong>kliknij aby wybrać</strong></div>
+          <div class="dz-filename" id="dz-filename-video"></div>
+        </div>
+        <div class="upload-progress" id="upload-progress-video">
+          <div class="upload-progress-fill" id="upload-progress-fill-video"></div>
+        </div>
+
+        <label style="margin-top:12px" data-i18n="subDropzoneText">Opcjonalnie: Gotowe napisy (.srt, .ass)</label>
+        <div class="drop-zone" id="drop-zone-sub" style="padding: 12px; margin-top: 4px;">
+          <input type="file" id="file-input-sub" accept=".srt,.ass" onchange="onSubFileChosen(this)"/>
+          <div class="dz-icon" style="font-size:1.3rem; margin-bottom:2px;">📝</div>
+          <div class="dz-text" style="font-size:0.75rem;" data-i18n="subDropzoneText">Przeciągnij napisy tutaj lub <strong>kliknij</strong></div>
+          <div class="dz-filename" id="dz-filename-sub"></div>
+        </div>
+        <div class="upload-progress" id="upload-progress-sub">
+          <div class="upload-progress-fill" id="upload-progress-fill-sub"></div>
+        </div>
+
+        <label style="margin-top:12px" data-i18n="orPathInput">Lub wpisz ścieżki ręcznie</label>
+        <input id="video-path" type="text" placeholder="/ścieżka/wideo.mp4" oninput="document.getElementById('dz-filename-video').textContent=''"/>
+        <input id="sub-path" type="text" placeholder="/ścieżka/napisy.srt" style="margin-top:6px" oninput="document.getElementById('dz-filename-sub').textContent=''"/>
+        <input id="yt-url" type="text" placeholder="https://youtube.com/watch?v=... (wideo YT)" style="margin-top:6px"/>
+
+        <!-- Rola wczytanych napisów: Do przetłumaczenia czy Gotowe tłumaczenie -->
+        <div id="sub-role-container" style="margin-top:8px; padding:8px 10px; border-radius:6px; background:rgba(255,255,255,0.03); border:1px solid var(--border);">
+          <span style="font-size:0.75rem; color:var(--muted); font-weight:500;">Rola wczytanego pliku napisów:</span>
+          <div style="display:flex; flex-direction:column; gap:4px; margin-top:5px;">
+            <label style="display:flex; align-items:center; gap:6px; margin:0; font-size:0.78rem; cursor:pointer;">
+              <input type="radio" name="sub-role" id="sub-role-orig" value="original" checked/>
+              <span>🌐 <strong>Oryginał</strong> (wymaga przetłumaczenia przez AI)</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; margin:0; font-size:0.78rem; cursor:pointer;">
+              <input type="radio" name="sub-role" id="sub-role-trans" value="translation"/>
+              <span>✅ <strong>Gotowe tłumaczenie</strong> (bezpośrednio do dubbingu)</span>
+            </label>
+          </div>
+        </div>
+
+        <label data-i18n="srcLangLabel" style="margin-top:10px;">Język źródłowy</label>
+
+        <select id="source-lang">
+          <option value="auto" selected>🔍 Auto (wykryj automatycznie)</option>
+          {% for lang in languages %}<option value="{{lang}}">{{lang}}</option>{% endfor %}
+        </select>
+        <label data-i18n="tgtLangLabel">Język docelowy</label>
+        <select id="target-lang" onchange="suggestDubbingLanguage(this.value)">
+          {% for lang in languages %}<option value="{{lang}}" {% if lang=='Polish' %}selected{% endif %}>{{lang}}</option>{% endfor %}
+        </select>
+        <label data-i18n="whisperLabel">Model Whisper (jeśli brak plików napisów)</label>
+        <select id="whisper-model">
+          <option>tiny</option><option>base</option><option>small</option>
+          <option>medium</option><option>large</option><option selected>turbo</option>
+        </select>
+        <label data-i18n="hfLabel">Token HuggingFace (opcjonalnie)</label>
+        <input id="hf-token" type="password" placeholder="hf_..."/>
+        <br/>
+        <div class="row" style="margin-top:10px">
+          <button class="btn btn-primary" id="btn-load" onclick="loadVideo()" data-i18n="btnLoadVideo">
+            🚀 Wczytaj i Transkrybuj
+          </button>
+          <button class="btn btn-danger" id="btn-cancel-load" onclick="cancelLoadVideo()" style="display:none;" data-i18n="btnCancelLoad">
+            🛑 Zatrzymaj
+          </button>
+        </div>
+      </div>
+
+      <!-- Edit Selected -->
+      <div class="panel" id="edit-panel">
+        <h4 data-i18n="editSubtitleTitle">✏️ Edit Selected Subtitle</h4>
+        <div class="row">
+          <div style="flex:1"><label data-i18n="editStartLabel">Start</label><input id="edit-start" placeholder="00:00:00,000"/></div>
+          <div style="flex:1"><label data-i18n="editEndLabel">End</label><input id="edit-end" placeholder="00:00:05,000"/></div>
+        </div>
+        <label data-i18n="editTranslationLabel">Translation</label>
+        <textarea id="edit-text" rows="3"></textarea>
+        <!-- Approval status row -->
+        <div id="approval-row" style="margin-top:8px; padding:8px 10px; border-radius:8px; background:rgba(255,255,255,0.03); border:1px solid var(--border); display:flex; align-items:center; gap:10px; display:none;">
+          <span style="font-size:0.78rem; color:var(--muted); font-weight:500;">Status:</span>
+          <span id="approval-badge-edit" style="font-size:0.85rem;">—</span>
+          <div style="margin-left:auto; display:flex; gap:6px;">
+            <button class="btn btn-ghost btn-sm" onclick="setApproval('approved')" style="color:var(--green); padding:4px 10px;">✅ Zatwierdź</button>
+            <button class="btn btn-ghost btn-sm" onclick="setApproval('rejected')" style="color:var(--red); padding:4px 10px;">❌ Odrzuć</button>
+            <button class="btn btn-ghost btn-sm" onclick="setApproval('pending')" style="color:var(--yellow); padding:4px 10px;">⏳ Pending</button>
+          </div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn btn-primary" onclick="saveEdit()" data-i18n="btnSaveEdit">💾 Save</button>
+          <button class="btn btn-ghost" onclick="clearEdit()" data-i18n="btnClearEdit">✖ Clear</button>
+        </div>
+      </div>
+
+      <!-- AI Controls -->
+      <div class="panel">
+        <h4 data-i18n="aiPanelTitle">🤖 AI Translation</h4>
+        
+        <label>
+          <span data-i18n="aiEndpointLabel">Serwer / Endpoint AI (IP:Port)</span>
+          <button type="button" class="btn btn-ghost btn-sm" style="float:right;padding:1px 7px;font-size:.68rem;" onclick="checkOllama()">🔄 Testuj &amp; Odśwież</button>
+        </label>
+        <input id="ai-endpoint" type="text" placeholder="http://127.0.0.1:11434" value="http://127.0.0.1:11434" onchange="checkOllama()"/>
+
+        <label data-i18n="ollamaModelLabel">Model AI</label>
+        <select id="ollama-model">
+          {% for m in ollama_models %}<option>{{m}}</option>{% endfor %}
+        </select>
+        <label data-i18n="tempLabel">Temperature</label>
+        <input id="temperature" type="range" min="0" max="1" step="0.05" value="0.1" oninput="document.getElementById('temp-val').textContent=this.value"/>
+        <span id="temp-val" style="font-size:.75rem;color:var(--muted)">0.1</span>
+        <label>
+          <span data-i18n="promptLabel">AI Prompt</span>
+          <span style="float:right;font-size:.65rem;color:var(--muted)">max 5 lines</span>
+        </label>
+        <textarea id="prompt-textarea" rows="3" maxlength="1000"
+          placeholder="You are a professional translator. Translate from {source_lang} to {target_lang}. Return ONLY the final translation of the ONE given line. Do NOT add notes, numbers, explanations, or quotes."
+          oninput="enforceFiveLines(this)"
+        >You are a professional translator. Translate from {source_lang} to {target_lang}. Return ONLY the final translation of the ONE given line. Do NOT add notes, numbers, explanations, or quotes.</textarea>
+        <p style="font-size:.65rem;color:var(--muted);margin-top:3px">
+          Placeholders: <code>{source_lang}</code> <code>{target_lang}</code> <code>{text}</code> <code>{context}</code>
+        </p>
+        <div class="row" style="margin-top:10px">
+          <button class="btn btn-primary" id="btn-translate" onclick="translateAll()" data-i18n="btnTranslateAll">🌐 Translate All</button>
+          <button class="btn btn-danger" id="btn-cancel-translate" onclick="cancelTranslation()" style="display:none;" data-i18n="btnCancelTranslate">🛑 Zatrzymaj</button>
+          <button class="btn btn-ghost" id="btn-context" onclick="analyzeContext()" data-i18n="btnAnalyzeContext">Context</button>
+        </div>
+        <div id="context-output" style="display:none;margin-top:8px;font-size:.72rem;color:var(--muted);
+          background:rgba(0,0,0,.3);border-radius:6px;padding:8px;max-height:80px;overflow-y:auto;"></div>
+      </div>
+
+      <!-- Dubbing -->
+      <div class="panel">
+        <h4 data-i18n="dubPanelTitle">🔊 Generuj Audio / Napisy</h4>
+        <label data-i18n="dubLangLabel">Język docelowy dubbingu</label>
+        <select id="dub-lang">
+          {% for lang in languages %}<option value="{{lang}}" {% if lang=='Polish' %}selected{% endif %}>{{lang}}</option>{% endfor %}
+        </select>
+
+        <label style="margin-top:10px" data-i18n="outputModeLabel">Tryb wyjścia</label>
+        <div style="display:flex;gap:15px;margin-top:4px;">
+          <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:.82rem;color:var(--text);cursor:pointer;">
+            <input type="radio" name="output-mode" id="mode-dubbing" value="dubbing" checked onchange="onModeChange()"/>
+            <span data-i18n="modeDubbing">🎙️ Dubbing</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:.82rem;color:var(--text);cursor:pointer;">
+            <input type="radio" name="output-mode" id="mode-lektor" value="lektor" onchange="onModeChange()"/>
+            <span data-i18n="modeLektor">🗣️ Lektor</span>
+          </label>
+        </div>
+        <p id="mode-desc" style="font-size:.72rem;color:var(--muted);margin-top:4px" data-i18n="modeDubbingDesc">Dubbing: głos zsynchronizowany z obrazem, klonowanie głosu możliwe.</p>
+
+        <label data-i18n="ttsEngineLabel">Silnik TTS</label>
+        <select id="tts-engine" onchange="toggleVoiceOptions()">
+          <option value="xtts">🤖 XTTS v2 — Dubbing (Alpha, klonowanie głosu)</option>
+          <option value="qwen">🤖 Qwen3-TTS — Dubbing (Alpha, klonowanie głosu)</option>
+          <option value="edge" selected>🗣️ Edge-TTS — Lektor (szybki &amp; naturalny)</option>
+          <option value="gtts">🗣️ gTTS — Lektor (Google)</option>
+        </select>
+        <div id="voice-settings-group">
+          <label data-i18n="voiceRefLabel">Głos referencyjny (do klonowania)</label>
+          <div class="row" style="display:flex; gap:6px;">
+            <select id="voice-select" style="flex:1;"><option value="Default">Default</option></select>
+            <button class="btn btn-ghost" onclick="previewVoice()" style="flex:0 0 auto;" data-i18n="previewBtn">▶ Podgląd</button>
+          </div>
+          <audio id="voice-preview-audio" style="display:none;"></audio>
+        </div>
+
+        <label><input type="checkbox" id="keep-bg" checked/> <span data-i18n="keepBgLabel">Zachowaj oryginalne tło audio</span></label>
+        <label><input type="checkbox" id="hardsub"/> <span data-i18n="hardsubLabel">🔥 Wypal napisy na wideo (Hardsub)</span></label>
+        
+        <div class="row" style="margin-top:6px; display:flex; gap:10px;">
+          <div style="flex:2">
+            <label data-i18n="validationLabel">Model Whisper (walidacja TTS)</label>
+            <select id="validation-model">
+              <option value="None" selected>Brak walidacji (Zalecane)</option>
+              <option value="tiny">tiny</option>
+              <option value="base">base</option>
+              <option value="small">small</option>
+              <option value="medium">medium</option>
+              <option value="turbo">turbo</option>
+            </select>
+          </div>
+          <div style="flex:1">
+            <label title="Maksymalna liczba ponownych prób syntezy w przypadku błędu Whisper">Max prób</label>
+            <input type="number" id="auto-retry-count" min="1" max="10" value="10" style="text-align:center;"/>
+          </div>
+        </div>
+
+        <!-- Audio Enhancer Toggle -->
+        <div style="margin-top:10px; padding:10px 12px; border-radius:8px; background:rgba(99,102,241,0.06); border:1px solid rgba(99,102,241,0.2);">
+          <label style="margin:0;"><input type="checkbox" id="audio-enhance"/> <span style="font-size:0.82rem; font-weight:600; color:#a5b4fc;">✨ Ulepsz jakość audio AI (Denoise &amp; Clarity)</span></label>
+          <div id="enhance-options" style="margin-top:6px; display:flex; gap:6px;">
+            <select id="enhance-method" style="font-size:0.75rem; padding:6px 8px;">
+              <option value="dsp_denoise" selected>Standardowy Denoise &amp; De-rumble (DSP)</option>
+              <option value="broadcast_voice">Emisyjny Lektor / Podcast (Warmth &amp; DynNorm)</option>
+              <option value="neural_enhance">Neuronowe DeepFilterNet (AI Suppression)</option>
+            </select>
+          </div>
+        </div>
+        
+        <label data-i18n="outputPathLabel">Ścieżka zapisu wideo</label>
+        <input type="text" id="output-video-path" placeholder="/ścieżka/do/wyniku.mp4"/>
+
+        <!-- Approval / Auto-Accept -->
+        <div style="margin-top:10px; padding:10px 12px; border-radius:8px; background:rgba(16,185,129,0.06); border:1px solid rgba(16,185,129,0.2);">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+            <span style="font-size:0.82rem; font-weight:600; color:var(--green);">✅ System zatwierdzania</span>
+            <span id="approval-stats" style="font-size:0.75rem; color:var(--muted);">—</span>
+          </div>
+          <label style="margin:0;"><input type="checkbox" id="auto-accept" checked/> <span style="font-size:0.82rem;">Auto-akceptuj wszystkie linie</span></label>
+          <div style="font-size:0.73rem; color:var(--muted); margin-top:4px;" id="approval-hint">Auto-akceptacja włączona — wszystkie linie zostaną przetworzone.</div>
+        </div>
+
+        <div class="row" style="margin-top:12px">
+          <button class="btn btn-primary" id="btn-generate" style="width:100%;" onclick="generateDubbing()" data-i18n="btnGenerate">
+            🎬 Generuj
+          </button>
+          <button class="btn btn-danger" id="btn-cancel-generate" style="width:100%; display:none;" onclick="cancelGenerateDubbing()" data-i18n="btnCancelGenerate">
+            🛑 Zatrzymaj
+          </button>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="panel">
+        <h4 data-i18n="statsPanelTitle">📈 Statistics</h4>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:.8rem;">
+          <div><p style="color:var(--muted)" data-i18n="statTotal">Total Subtitles</p><p id="stat-total" style="font-size:1.3rem;font-weight:600">0</p></div>
+          <div><p style="color:var(--muted)" data-i18n="statEdited">Edited</p><p id="stat-edited" style="font-size:1.3rem;font-weight:600">0</p></div>
+          <div><p style="color:var(--muted)" data-i18n="statAvgConf">Avg Confidence</p><p id="stat-conf" style="font-size:1.3rem;font-weight:600">—</p></div>
+          <div><p style="color:var(--muted)" data-i18n="statDuration">Duration</p><p id="stat-dur" style="font-size:1.3rem;font-weight:600">—</p></div>
+        </div>
+      </div>
+
+    </div><!-- /right-scroll -->
+  </div><!-- /right -->
+</div><!-- /main -->
+
+<!-- ─── OLLAMA LOG PANEL (slide-up) ─── -->
+<div class="log-panel" id="log-panel">
+  <div class="log-header" onclick="toggleLog()">
+    <span class="log-title">
+      <span>🖥️ Ollama &amp; Process Logs</span>
+      <span class="log-badge" id="log-badge">0</span>
+    </span>
+    <span style="font-size:.78rem;color:var(--muted)" id="log-arrow">▲ show</span>
+  </div>
+  <div class="log-body" id="log-body"></div>
+</div>
+
+<script>
+/* ═════ Waveform animation stagger ═════ */
+(function(){
+  const bars = document.querySelectorAll('.wbar');
+  bars.forEach((b, i) => {
+    b.style.animationDelay = (i * 0.015) + 's';
+    b.style.height = (12 + (i * 0.4) % 28) + 'px';
+  });
+})();
+
+/* ═══════════════════════ TRANSLATION I18N ═══════════════════════ */
+const i18n = {
+  pl: {
+    title: "🎬 ViDubb Pro",
+    resetBtn: "🔄 Reset",
+    exportSrt: "💾 Eksportuj SRT",
+    downloadVideo: "📥 Pobierz Wideo",
+    projectManager: "📁 Projekty",
+    ollamaStatus: "Ollama: sprawdzanie…",
+    videoPlaceholder: "Brak załadowanego filmu — użyj panelu po prawej stronie",
+    subtitlesTitle: "📝 Ścieżki napisów",
+    btnSaveEdit: "💾 Zapisz",
+    btnClearEdit: "✖ Wyczyść",
+    editSubtitleTitle: "✏️ Edytuj wybrany napis",
+    editStartLabel: "Początek",
+    editEndLabel: "Koniec",
+    editTranslationLabel: "Tłumaczenie",
+    loadPanelTitle: "📁 Wczytaj Wideo i Napisy",
+    videoDropzoneText: "Przeciągnij wideo tutaj lub <strong>kliknij aby wybrać</strong>",
+    subDropzoneText: "Przeciągnij napisy tutaj lub <strong>kliknij</strong>",
+    orPathInput: "Lub wpisz ścieżki ręcznie",
+    srcLangLabel: "Język źródłowy",
+    tgtLangLabel: "Język docelowy",
+    whisperLabel: "Model Whisper (jeśli brak napisów)",
+    hfLabel: "Token HuggingFace (opcjonalnie)",
+    btnLoadVideo: "🚀 Wczytaj i Transkrybuj",
+    btnCancelLoad: "🛑 Zatrzymaj",
+    aiPanelTitle: "🤖 Tłumaczenie AI",
+    ollamaModelLabel: "Model Ollama",
+    tempLabel: "Temperatura",
+    promptLabel: "AI Prompt",
+    btnTranslateAll: "🌐 Tłumacz wszystko",
+    btnCancelTranslate: "🛑 Zatrzymaj",
+    btnAnalyzeContext: "Analizuj Kontekst",
+    dubPanelTitle: "🔊 Generuj Audio / Napisy",
+    dubLangLabel: "Język docelowy dubbingu",
+    outputModeLabel: "Tryb wyjściowy",
+    modeDubbing: "🎙️ Dubbing",
+    modeLektor: "🗣️ Lektor",
+    modeDubbingDesc: "Dubbing: głos zsynchronizowany z obrazem, klonowanie głosu możliwe.",
+    modeLektorDesc: "Lektor: głos lektora czyta tłumaczenie nad oryginalnym dźwiękiem.",
+    ttsEngineLabel: "Silnik TTS",
+    voiceRefLabel: "Głos referencyjny (do klonowania)",
+    previewBtn: "▶ Podgląd",
+    keepBgLabel: "Zachowaj oryginalne tło audio",
+    hardsubLabel: "🔥 Wypal napisy na wideo (Hardsub)",
+    validationLabel: "Model Whisper do weryfikacji TTS",
+    outputPathLabel: "Ścieżka zapisu wideo",
+    btnGenerate: "🎬 Generuj",
+    btnCancelGenerate: "🛑 Zatrzymaj",
+    statsPanelTitle: "📈 Statystyki",
+    statTotal: "Wszystkie napisy",
+    statEdited: "Przetłumaczone",
+    statAvgConf: "Śr. Pewność",
+    statDuration: "Czas trwania",
+    pmTitle: "Katalog Projektów (DaVinci Resolve style)",
+    pmCreateBtn: "Utwórz projekt",
+    pmNamePlaceholder: "Nazwa nowego projektu...",
+    pmOpenBtn: "Otwórz",
+    pmDeleteBtn: "Usuń",
+    pmNoProjects: "Brak projektów. Utwórz nowy powyżej.",
+    langSelectTitle: "Wybierz język interfejsu / Select Language",
+    statusReady: "Gotowy.",
+    statusLoading: "Wczytywanie i transkrypcja...",
+    statusProcessing: "Generowanie dubbingu...",
+    statusSuccess: "Sukces!",
+    statusError: "Błąd."
+  },
+  en: {
+    title: "🎬 ViDubb Pro",
+    resetBtn: "🔄 Reset",
+    exportSrt: "💾 Export SRT",
+    downloadVideo: "📥 Download Video",
+    projectManager: "📁 Projects",
+    ollamaStatus: "Ollama: checking…",
+    videoPlaceholder: "No video loaded — use the controls on the right",
+    subtitlesTitle: "📝 Subtitle Tracks",
+    btnSaveEdit: "💾 Save",
+    btnClearEdit: "✖ Clear",
+    editSubtitleTitle: "✏️ Edit Selected Subtitle",
+    editStartLabel: "Start",
+    editEndLabel: "End",
+    editTranslationLabel: "Translation",
+    loadPanelTitle: "📁 Load Video & Subtitles",
+    videoDropzoneText: "Drag video here or <strong>click to select</strong>",
+    subDropzoneText: "Drag subtitles here or <strong>click</strong>",
+    orPathInput: "Or input file paths manually",
+    srcLangLabel: "Source Language",
+    tgtLangLabel: "Target Language",
+    whisperLabel: "Whisper Model (if no subtitles)",
+    hfLabel: "HuggingFace Token (optional)",
+    btnLoadVideo: "🚀 Load & Transcribe",
+    btnCancelLoad: "🛑 Cancel",
+    aiPanelTitle: "🤖 AI Translation",
+    ollamaModelLabel: "Ollama Model",
+    tempLabel: "Temperature",
+    promptLabel: "AI Prompt",
+    btnTranslateAll: "🌐 Translate All",
+    btnCancelTranslate: "🛑 Cancel",
+    btnAnalyzeContext: "Analyze Context",
+    dubPanelTitle: "🔊 Generate Dubbing / Subtitles",
+    dubLangLabel: "Target Dubbing Language",
+    outputModeLabel: "Output Mode",
+    modeDubbing: "🎙️ Dubbing",
+    modeLektor: "🗣️ Voiceover",
+    modeDubbingDesc: "Dubbing: voice synchronized with video, cloning possible.",
+    modeLektorDesc: "Voiceover: narrator reads translation over original background.",
+    ttsEngineLabel: "TTS Engine",
+    voiceRefLabel: "Reference Voice (for cloning)",
+    previewBtn: "▶ Preview",
+    keepBgLabel: "Keep original background audio",
+    hardsubLabel: "🔥 Burn subtitles into video (Hardsub)",
+    validationLabel: "Whisper model for TTS validation",
+    outputPathLabel: "Video output path",
+    btnGenerate: "🎬 Generate",
+    btnCancelGenerate: "🛑 Cancel",
+    statsPanelTitle: "📈 Statistics",
+    statTotal: "Total Subtitles",
+    statEdited: "Translated",
+    statAvgConf: "Avg. Confidence",
+    statDuration: "Duration",
+    pmTitle: "Projects Manager (DaVinci Resolve style)",
+    pmCreateBtn: "Create Project",
+    pmNamePlaceholder: "New project name...",
+    pmOpenBtn: "Open",
+    pmDeleteBtn: "Delete",
+    pmNoProjects: "No projects found. Create a new one above.",
+    langSelectTitle: "Select Interface Language",
+    statusReady: "Ready.",
+    statusLoading: "Loading and transcribing...",
+    statusProcessing: "Generating dubbing...",
+    statusSuccess: "Success!",
+    statusError: "Error."
+  }
+};
+
+let currentLang = localStorage.getItem('vidubb_lang') || '';
+let activeProject = null;
+let rows = [];          // subtitle rows
+let selIdx = -1;        // selected row index
+let logOpen = false;
+let logCount = 0;       // how many lines already fetched
+let ollamaOk = false;
+
+
+function applyLanguage(lang) {
+  currentLang = lang;
+  localStorage.setItem('vidubb_lang', lang);
+  
+  const translations = i18n[lang];
+  if (!translations) return;
+
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (translations[key]) {
+
+      const inputChild = el.querySelector('input');
+      if (inputChild) {
+
+        el.innerHTML = '';
+        el.appendChild(inputChild);
+        el.appendChild(document.createTextNode(' ' + translations[key]));
+      } else {
+        el.textContent = translations[key];
+      }
+    }
+  });
+
+
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    if (translations[key]) {
+      el.placeholder = translations[key];
+    }
+  });
+}
+
+function chooseLanguage(lang) {
+  applyLanguage(lang);
+  document.getElementById('lang-modal').style.display = 'none';
+  showProjectManager();
+}
+
+/* ═══════════════════════ PROJECT MANAGER ═══════════════════════ */
+function showProjectManager() {
+  document.getElementById('project-modal').style.display = 'flex';
+  refreshProjectsList();
+}
+
+async function refreshProjectsList() {
+  try {
+    const r = await fetch('/api/projects');
+    const d = await r.json();
+    const container = document.getElementById('projects-list-container');
+    container.innerHTML = '';
+    
+    if (!d.projects || d.projects.length === 0) {
+      container.innerHTML = `<p style="text-align: center; color: var(--muted); padding: 20px 0;" data-i18n="pmNoProjects">${i18n[currentLang].pmNoProjects}</p>`;
+      return;
+    }
+    
+    d.projects.forEach(p => {
+      const date = new Date(p.updated_at * 1000).toLocaleString(currentLang === 'pl' ? 'pl-PL' : 'en-US');
+      const item = document.createElement('div');
+      item.className = 'project-item';
+      item.innerHTML = `
+        <div class="project-details">
+          <span class="project-name">📁 ${p.name}</span>
+          <span class="project-date">${date}</span>
+        </div>
+        <div class="project-actions">
+          <button class="btn btn-ghost btn-sm" onclick="loadProject('${p.name}')">${i18n[currentLang].pmOpenBtn}</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteProject('${p.name}')">${i18n[currentLang].pmDeleteBtn}</button>
+        </div>
+      `;
+      container.appendChild(item);
+    });
+  } catch(e) {}
+}
+
+async function createNewProject() {
+  const nameInput = document.getElementById('new-project-name');
+  const name = nameInput.value.trim();
+  if (!name) return;
+  
+  try {
+    const r = await fetch('/api/projects/new', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name })
+    });
+    const d = await r.json();
+    if (d.success) {
+      nameInput.value = '';
+      activeProject = d.project;
+      document.getElementById('project-modal').style.display = 'none';
+      loadProjectState(d.project);
+    } else {
+      alert(d.error || 'Błąd tworzenia projektu');
+    }
+  } catch(e) {
+    alert('Error: ' + e);
+  }
+}
+
+async function loadProject(name) {
+  try {
+    const r = await fetch('/api/projects/load', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name })
+    });
+    const d = await r.json();
+    if (d.success) {
+      activeProject = d.project;
+      document.getElementById('project-modal').style.display = 'none';
+      loadProjectState(d.project);
+    }
+  } catch(e) {}
+}
+
+async function deleteProject(name) {
+  if (!confirm(currentLang === 'pl' ? `Czy na pewno chcesz usunąć projekt '${name}'?` : `Are you sure you want to delete project '${name}'?`)) return;
+  try {
+    const r = await fetch('/api/projects/delete', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ name })
+    });
+    const d = await r.json();
+    if (d.success) {
+      refreshProjectsList();
+    }
+  } catch(e) {}
+}
+
+async function loadProjectState(proj) {
+  document.getElementById('active-proj-badge').textContent = proj.name;
+  document.getElementById('video-path').value = proj.video_path || '';
+  document.getElementById('sub-path').value = proj.subtitles_path || '';
+  document.getElementById('source-lang').value = proj.source_lang || 'auto';
+  document.getElementById('target-lang').value = proj.target_lang || 'Polish';
+  document.getElementById('whisper-model').value = proj.whisper_model || 'turbo';
+  document.getElementById('hf-token').value = proj.hf_token || '';
+  document.getElementById('ollama-model').value = proj.ollama_model || '';
+  document.getElementById('temperature').value = proj.temperature || 0.1;
+  document.getElementById('temp-val').textContent = proj.temperature || 0.1;
+  document.getElementById('prompt-textarea').value = proj.prompt;
+  document.getElementById('dub-lang').value = proj.dub_lang || 'Polish';
+  document.getElementById('tts-engine').value = proj.tts_engine || 'edge';
+  document.getElementById('voice-select').value = proj.voice || 'Default';
+  document.getElementById('keep-bg').checked = proj.keep_bg;
+  document.getElementById('hardsub').checked = proj.hardsub;
+  document.getElementById('validation-model').value = proj.validation_model || 'None';
+  document.getElementById('ai-endpoint').value = proj.ai_endpoint || 'http://127.0.0.1:11434';
+  document.getElementById('auto-retry-count').value = proj.auto_retry_count || 10;
+  document.getElementById('audio-enhance').checked = !!proj.audio_enhance;
+  document.getElementById('enhance-method').value = proj.enhance_method || 'dsp_denoise';
+  document.getElementById('output-video-path').value = proj.output_video_path || '';
+  
+  if (proj.output_mode === 'lektor') {
+    document.getElementById('mode-lektor').checked = true;
+  } else {
+    document.getElementById('mode-dubbing').checked = true;
+  }
+  
+  if (proj.context) {
+    const box = document.getElementById('context-output');
+    box.style.display = 'block';
+    box.textContent = proj.context;
+  } else {
+    document.getElementById('context-output').style.display = 'none';
+  }
+
+  if (proj.video_path) {
+    const vp = document.getElementById('video-player');
+    vp.src = 'file://' + proj.video_path;
+    vp.style.display = 'block';
+    document.getElementById('video-placeholder').style.display = 'none';
+  } else {
+    document.getElementById('video-player').style.display = 'none';
+    document.getElementById('video-placeholder').style.display = 'flex';
+  }
+
+  rows = proj.subtitles || [];
+  renderTable();
+  toggleVoiceOptions();
+
+
+  const savedVoice = proj.voice || 'Default';
+  try {
+    const rv = await fetch('/api/voices');
+    const dv = await rv.json();
+    const sel = document.getElementById('voice-select');
+    sel.innerHTML = dv.voices.map(v =>
+      `<option value="${v}"${v === savedVoice ? ' selected' : ''}>${v}</option>`
+    ).join('');
+
+    if (!dv.voices.includes(savedVoice)) sel.value = 'Default';
+  } catch(e) {}
+}
+
+async function syncToServer() {
+  if (!activeProject) return;
+  const mode = document.querySelector('input[name="output-mode"]:checked').value;
+  const body = {
+    subtitles: rows,
+    video_path: document.getElementById('video-path').value,
+    subtitles_path: document.getElementById('sub-path').value,
+    yt_url: document.getElementById('yt-url').value,
+    source_lang: document.getElementById('source-lang').value,
+    target_lang: document.getElementById('target-lang').value,
+    whisper_model: document.getElementById('whisper-model').value,
+    hf_token: document.getElementById('hf-token').value,
+    ollama_model: document.getElementById('ollama-model').value,
+    temperature: parseFloat(document.getElementById('temperature').value),
+    prompt: document.getElementById('prompt-textarea').value,
+    dub_lang: document.getElementById('dub-lang').value,
+    output_mode: mode,
+    tts_engine: document.getElementById('tts-engine').value,
+    voice: document.getElementById('voice-select').value,
+    keep_bg: document.getElementById('keep-bg').checked,
+    hardsub: document.getElementById('hardsub').checked,
+    validation_model: document.getElementById('validation-model').value,
+    ai_endpoint: document.getElementById('ai-endpoint').value,
+    auto_retry_count: parseInt(document.getElementById('auto-retry-count')?.value || 10),
+    audio_enhance: document.getElementById('audio-enhance')?.checked || false,
+    enhance_method: document.getElementById('enhance-method')?.value || 'dsp_denoise',
+    output_video_path: document.getElementById('output-video-path').value
+  };
+  
+  await fetch('/api/projects/save', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  });
+}
+
+
+function suggestDubbingLanguage(tgtLang) {
+  document.getElementById('dub-lang').value = tgtLang;
+  syncToServer();
+}
+
+/* ═══════════════════════ OLLAMA / AI STATUS POLLING ═══════════════════════ */
+async function checkOllama() {
+  try {
+    const ep = document.getElementById('ai-endpoint')?.value?.trim() || '';
+    const r = await fetch('/api/ollama/status' + (ep ? `?endpoint=${encodeURIComponent(ep)}` : ''));
+    const d = await r.json();
+    ollamaOk = d.connected;
+    document.getElementById('ollama-dot').className = 'ollama-dot ' + (ollamaOk ? 'ok' : 'err');
+    document.getElementById('ollama-label').textContent = (ollamaOk ? (currentLang === 'pl' ? 'AI: połączono' : 'AI: connected') : 'AI: offline');
+    if (d.models && d.models.length) {
+      const sel = document.getElementById('ollama-model');
+      const cur = sel.value;
+      let matched = false;
+      sel.innerHTML = d.models.map(m => {
+        const isSel = !matched && (m === cur || m.split(':')[0] === cur.split(':')[0]);
+        if (isSel) matched = true;
+        return `<option value="${m}"${isSel ? ' selected' : ''}>${m}</option>`;
+      }).join('');
+    }
+  } catch(e) {
+    document.getElementById('ollama-dot').className = 'ollama-dot err';
+    document.getElementById('ollama-label').textContent = 'AI: error';
+  }
+}
+setInterval(checkOllama, 8000);
+
+
+
+/* ═══════════════════════ RVC & VOICES MODELS ═══════════════════════ */
+async function loadModels() {
+  try {
+    const r2 = await fetch('/api/voices');
+    const d2 = await r2.json();
+    const sel2 = document.getElementById('voice-select');
+    const cur2 = sel2.value;
+    sel2.innerHTML = d2.voices.map(v => `<option value="${v}"${v===cur2?' selected':''}>${v}</option>`).join('');
+  } catch(e) {}
+}
+setInterval(loadModels, 10000);
+
+function onModeChange() {
+  const mode = document.querySelector('input[name="output-mode"]:checked').value;
+  const desc = document.getElementById('mode-desc');
+  const engine = document.getElementById('tts-engine');
+  
+  if (mode === 'lektor') {
+    desc.textContent = i18n[currentLang].modeLektorDesc;
+    if (engine.value === 'xtts' || engine.value === 'qwen') {
+      engine.value = 'edge';
+    }
+  } else {
+    desc.textContent = i18n[currentLang].modeDubbingDesc;
+  }
+  toggleVoiceOptions();
+  syncToServer();
+}
+
+
+document.addEventListener('DOMContentLoaded', () => {
+  const chk = document.getElementById('auto-accept');
+  if (chk) {
+    chk.addEventListener('change', () => updateApprovalStats());
+  }
+
+  const editText = document.getElementById('edit-text');
+  if (editText) {
+    editText.addEventListener('keydown', (e) => {
+
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        saveEdit();
+      }
+    });
+  }
+});
+
+
+function toggleVoiceOptions() {
+  const engine = document.getElementById('tts-engine').value;
+  const isCloning = (engine === 'xtts' || engine === 'qwen');
+  document.getElementById('voice-settings-group').style.display = isCloning ? 'block' : 'none';
+}
+
+function previewVoice() {
+  const voice = document.getElementById('voice-select').value;
+  if (voice === "Default") {
+    alert(currentLang === 'pl' ? "Domyślny głos referencyjny jest pobierany z wideo. Brak próbki." : "Default reference voice is extracted from video. No preview sample.");
+    return;
+  }
+  const audio = document.getElementById('voice-preview-audio');
+  audio.src = '/api/voices/' + encodeURIComponent(voice);
+  audio.play().catch(() => setStatus("❌ Error previewing voice", "err"));
+}
+
+/* ═══════════════════════ LOG POLLING ═══════════════════════ */
+function toggleLog() {
+  logOpen = !logOpen;
+  document.getElementById('log-panel').classList.toggle('open', logOpen);
+  document.getElementById('log-arrow').textContent = logOpen ? '▼ hide' : '▲ show';
+}
+
+function classifyLine(line) {
+  if (line.includes('✅') || line.includes('done') || line.includes('complete') || line.includes('Sukces') || line.includes('zakończony')) return 'ok';
+  if (line.includes('❌') || line.includes('Error') || line.includes('error') || line.includes('Błąd')) return 'err';
+  if (line.includes('⚠️') || line.includes('warn')) return 'warn';
+  return '';
+}
+
+async function fetchLogs() {
+  try {
+    const r = await fetch(`/api/ollama/logs?since=${logCount}`);
+    const d = await r.json();
+    if (d.logs && d.logs.length) {
+      const body = document.getElementById('log-body');
+      d.logs.forEach(line => {
+        const div = document.createElement('div');
+        div.className = 'log-line ' + classifyLine(line);
+        div.textContent = line;
+        body.appendChild(div);
+      });
+      body.scrollTop = body.scrollHeight;
+      logCount += d.logs.length;
+      document.getElementById('log-badge').textContent = d.total;
+    }
+  } catch(e) {}
+}
+setInterval(fetchLogs, 2000);
+
+/* ═══════════════════════ SUBTITLE TABLE ═══════════════════════ */
+function renderTable() {
+  const tbody = document.getElementById('sub-tbody');
+  tbody.innerHTML = '';
+  rows.forEach((row, i) => {
+    const tr = document.createElement('tr');
+    if (i === selIdx) tr.classList.add('selected');
+    if (row.Ignore) tr.style.opacity = '0.45';
+    const conf = row.Confidence ?? 85;
+
+    const apv = row.Approved || 'pending';
+    const apvMap = {
+      approved: { cls: 'badge-approved', label: '✅' },
+      rejected: { cls: 'badge-rejected', label: '❌' },
+      pending:  { cls: 'badge-pending',  label: '⏳' },
+    };
+    const ab = apvMap[apv] || apvMap.pending;
+    const ignChecked = row.Ignore ? 'checked' : '';
+    tr.innerHTML = `
+      <td>${row['Lp.'] ?? i+1}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:.75rem">${row.Start ?? ''}</td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:.75rem">${row.End ?? ''}</td>
+      <td>${esc(row.Original ?? '')}</td>
+      <td>${esc(row.Translation ?? '')}${row.Edited ? ' <span class="badge-edited">✓</span>' : ''}</td>
+      <td style="color:var(--muted)">${row.Speaker ?? ''}</td>
+      <td>
+        <span>${conf}</span>
+        <div class="conf-bar"><div class="conf-fill" style="width:${conf}%"></div></div>
+      </td>
+      <td><span class="${ab.cls}" onclick="event.stopPropagation(); toggleApproval(${i})" title="Click to cycle: pending→approved→rejected">${ab.label}</span></td>
+      <td><input type="checkbox" ${ignChecked} title="Ignoruj — pomija tłumaczenie i dubbing" onclick="event.stopPropagation(); toggleIgnore(${i})" style="cursor:pointer;width:16px;height:16px;accent-color:var(--yellow)"></td>`;
+    tr.onclick = () => selectRow(i);
+    tbody.appendChild(tr);
+  });
+  updateStats();
+  updateApprovalStats();
+  document.getElementById('sub-count').textContent = `(${rows.length})`;
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function selectRow(i) {
+  selIdx = i;
+  const row = rows[i];
+  document.getElementById('edit-start').value = row.Start ?? '';
+  document.getElementById('edit-end').value   = row.End ?? '';
+  document.getElementById('edit-text').value  = row.Translation || row.Original || '';
+
+  const apvRow = document.getElementById('approval-row');
+  apvRow.style.display = 'flex';
+  updateApprovalBadgeEdit(row.Approved || 'pending');
+  renderTable();
+}
+
+function updateApprovalBadgeEdit(status) {
+  const badge = document.getElementById('approval-badge-edit');
+  const map = { approved: '✅ Zatwierdzona', rejected: '❌ Odrzucona', pending: '⏳ Oczekuje' };
+  const colors = { approved: 'var(--green)', rejected: 'var(--red)', pending: 'var(--yellow)' };
+  badge.textContent = map[status] || '⏳ Oczekuje';
+  badge.style.color = colors[status] || 'var(--yellow)';
+  badge.style.fontWeight = '600';
+}
+
+function setApproval(status) {
+  if (selIdx < 0 || selIdx >= rows.length) return;
+  rows[selIdx].Approved = status;
+  updateApprovalBadgeEdit(status);
+  renderTable();
+  syncToServer();
+
+  if (status !== 'pending' && selIdx + 1 < rows.length) {
+    setTimeout(() => selectRow(selIdx + 1), 150);
+  }
+}
+
+function toggleApproval(i) {
+  const cur = rows[i].Approved || 'pending';
+  const cycle = { pending: 'approved', approved: 'rejected', rejected: 'pending' };
+  rows[i].Approved = cycle[cur];
+  renderTable();
+  syncToServer();
+}
+
+function toggleIgnore(i) {
+  rows[i].Ignore = !rows[i].Ignore;
+  renderTable();
+  syncToServer();
+  const msg = rows[i].Ignore
+    ? `🔇 Wiersz ${i+1} oznaczony jako ignorowany (muzyka/intro).`
+    : `🔊 Wiersz ${i+1} odblokowany do tłumaczenia i dubbingu.`;
+  setStatus(msg, rows[i].Ignore ? 'warn' : 'ok');
+}
+
+function approveAll() {
+  rows.forEach(r => r.Approved = 'approved');
+  renderTable();
+  syncToServer();
+  setStatus('✅ Wszystkie linie zatwierdzone.', 'ok');
+}
+
+function rejectAll() {
+  rows.forEach(r => r.Approved = 'rejected');
+  renderTable();
+  syncToServer();
+  setStatus('❌ Wszystkie linie odrzucone.', 'err');
+}
+
+function resetApproval() {
+  rows.forEach(r => r.Approved = 'pending');
+  renderTable();
+  syncToServer();
+  setStatus('🔄 Status zatwierdzenia zresetowany.', '');
+}
+
+function updateApprovalStats() {
+  const total = rows.length;
+  if (total === 0) { document.getElementById('approval-stats').textContent = '—'; return; }
+  const approved = rows.filter(r => r.Approved === 'approved').length;
+  const rejected = rows.filter(r => r.Approved === 'rejected').length;
+  const pending  = rows.filter(r => !r.Approved || r.Approved === 'pending').length;
+  document.getElementById('approval-stats').textContent =
+    `✅${approved} ❌${rejected} ⏳${pending}`;
+
+  const autoAccept = document.getElementById('auto-accept')?.checked;
+  const hint = document.getElementById('approval-hint');
+  if (hint) {
+    if (autoAccept) {
+      hint.textContent = 'Auto-akceptacja włączona — wszystkie linie zostaną przetworzone.';
+      hint.style.color = 'var(--muted)';
+    } else {
+      hint.textContent = `Ręczne zatwierdzanie: ${approved} zatwierdzone, ${rejected} odrzucone, ${pending} oczekuje.`;
+      hint.style.color = pending > 0 ? 'var(--yellow)' : 'var(--green)';
+    }
+  }
+}
+
+function saveEdit() {
+  if (selIdx < 0 || selIdx >= rows.length) return;
+  rows[selIdx].Start       = document.getElementById('edit-start').value;
+  rows[selIdx].End         = document.getElementById('edit-end').value;
+  rows[selIdx].Translation = document.getElementById('edit-text').value;
+  rows[selIdx].Edited      = true;
+  const nextIdx = selIdx + 1;
+  renderTable();
+  syncToServer();
+  setStatus('✅ Saved.', 'ok');
+
+  if (nextIdx < rows.length) {
+    selectRow(nextIdx);
+  }
+}
+
+
+function clearEdit() {
+  selIdx = -1;
+  document.getElementById('edit-start').value = '';
+  document.getElementById('edit-end').value = '';
+  document.getElementById('edit-text').value = '';
+  renderTable();
+}
+
+function addSubtitle() {
+  const last = rows[rows.length - 1];
+  const lastEnd = last ? parseTime(last.End) : 0;
+  rows.push({
+    'Lp.': rows.length + 1,
+    Start: formatTime(lastEnd),
+    End:   formatTime(lastEnd + 3000),
+    Original: 'New subtitle',
+    Translation: '',
+    Speaker: 'Unknown',
+    Confidence: 100,
+    Edited: true
+  });
+  renderTable();
+  syncToServer();
+}
+
+function splitSubtitle() {
+  if (selIdx < 0) return;
+  const row = rows[selIdx];
+  const text = row.Original || '';
+  const mid = Math.floor(text.length / 2);
+  const t1 = text.slice(0, mid).trim(), t2 = text.slice(mid).trim();
+  if (!t1 || !t2) return;
+  const start = parseTime(row.Start), end = parseTime(row.End);
+  const midT = Math.floor((start + end) / 2);
+  row.End = formatTime(midT); row.Original = t1; row.Translation = '';
+  const newRow = { ...row, Start: formatTime(midT), End: formatTime(end), Original: t2, Translation: '', Edited: true };
+  rows.splice(selIdx + 1, 0, newRow);
+  renumber();
+  renderTable();
+  syncToServer();
+}
+
+function mergeSubtitle() {
+  if (selIdx < 0 || selIdx >= rows.length - 1) return;
+  const r1 = rows[selIdx], r2 = rows[selIdx + 1];
+  r1.Original = r1.Original + ' ' + r2.Original;
+  r1.End = r2.End;
+  r1.Translation = '';
+  r1.Edited = true;
+  rows.splice(selIdx + 1, 1);
+  renumber();
+  renderTable();
+  syncToServer();
+}
+
+function deleteSubtitle() {
+  if (selIdx < 0) return;
+  rows.splice(selIdx, 1);
+  selIdx = -1;
+  renumber();
+  renderTable();
+  clearEdit();
+  syncToServer();
+}
+
+function renumber() {
+  rows.forEach((r, i) => r['Lp.'] = i + 1);
+}
+
+async function refreshSubtitles() {
+  const r = await fetch('/api/subtitles');
+  const d = await r.json();
+  if (d.rows && d.rows.length) {
+    rows = d.rows;
+    renderTable();
+  }
+}
+
+/* ─── STATS ─── */
+function updateStats() {
+  document.getElementById('stat-total').textContent = rows.length;
+  document.getElementById('stat-edited').textContent = rows.filter(r => r.Edited).length;
+  const confs = rows.map(r => r.Confidence ?? 85);
+  document.getElementById('stat-conf').textContent = confs.length ? Math.round(confs.reduce((a,b)=>a+b,0)/confs.length) + '%' : '—';
+  if (rows.length) {
+    const lastEnd = parseTime(rows[rows.length-1].End);
+    document.getElementById('stat-dur').textContent = (lastEnd/1000).toFixed(1) + 's';
+  }
+}
+
+/* ─── TIME UTILS ─── */
+function parseTime(s) {
+  if (!s) return 0;
+  const parts = s.split(':');
+  if (parts.length === 3) {
+    const [h, m, sms] = parts;
+    const [sec, ms] = (sms || '0').replace(',', '.').split('.');
+    return (parseInt(h)*3600 + parseInt(m)*60 + parseInt(sec)) * 1000 + parseInt(ms||0);
+  }
+  return 0;
+}
+function pad2(n){ return String(n).padStart(2,'0'); }
+function formatTime(ms) {
+  const h = Math.floor(ms/3600000);
+  const m = Math.floor((ms%3600000)/60000);
+  const s = Math.floor((ms%60000)/1000);
+  const ml = ms % 1000;
+  return `${pad2(h)}:${pad2(m)}:${pad2(s)},${String(ml).padStart(3,'0')}`;
+}
+
+/* ─── STATUS BAR ─── */
+function setStatus(msg, cls) {
+  const bar = document.getElementById('status-text');
+  bar.textContent = msg;
+  const statusContainer = document.getElementById('status-bar');
+  statusContainer.className = 'status-bar ' + (cls || '');
+}
+
+/* ─── PROMPT 5-LINE ENFORCER ─── */
+function enforceFiveLines(el) {
+  const lines = el.value.split('\n');
+  if (lines.length > 5) {
+    el.value = lines.slice(0, 5).join('\n');
+  }
+}
+
+/* ─── FILE DROP / PICK ─── */
+let uploadedVideoPath = '';
+let uploadedSubPath = '';
+
+function onVideoFileChosen(input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('dz-filename-video').textContent = '📂 ' + file.name;
+  document.getElementById('video-path').value = '';
+  document.getElementById('yt-url').value = '';
+  const vp = document.getElementById('video-player');
+  vp.src = URL.createObjectURL(file);
+  vp.style.display = 'block';
+  document.getElementById('video-placeholder').style.display = 'none';
+  uploadFile(file, 'video');
+}
+
+function onSubFileChosen(input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('dz-filename-sub').textContent = '📝 ' + file.name;
+  document.getElementById('sub-path').value = '';
+  uploadFile(file, 'sub');
+}
+
+async function uploadFile(file, type) {
+  const progId = type === 'video' ? 'upload-progress-video' : 'upload-progress-sub';
+  const fillId = type === 'video' ? 'upload-progress-fill-video' : 'upload-progress-fill-sub';
+  const prog = document.getElementById(progId);
+  const fill  = document.getElementById(fillId);
+  prog.style.display = 'block';
+  fill.style.width = '10%';
+  setStatus(currentLang === 'pl' ? `Wysyłanie pliku ${type}...` : `Uploading ${type}...`, 'busy');
+  
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/upload_video');
+    xhr.upload.onprogress = e => {
+      if (e.lengthComputable) fill.style.width = Math.round(e.loaded/e.total*90) + '%';
+    };
+    xhr.onload = () => {
+      fill.style.width = '100%';
+      setTimeout(() => { prog.style.display = 'none'; fill.style.width = '0%'; }, 600);
+      if (xhr.status === 200) {
+        const d = JSON.parse(xhr.responseText);
+        if (type === 'video') {
+            uploadedVideoPath = d.path;
+            document.getElementById('video-path').value = d.path;
+
+            const filenameNoExt = d.filename.substring(0, d.filename.lastIndexOf('.')) || d.filename;
+            document.getElementById('output-video-path').value = d.path.substring(0, d.path.lastIndexOf(d.filename)) + filenameNoExt + '_dubbed.mp4';
+        } else {
+            uploadedSubPath = d.path;
+            document.getElementById('sub-path').value = d.path;
+        }
+        setStatus(currentLang === 'pl' ? 'Plik załadowany: ' + d.filename : 'File loaded: ' + d.filename, 'ok');
+        syncToServer();
+      } else {
+        setStatus('Upload error', 'err');
+      }
+    };
+    xhr.onerror = () => setStatus('Connection error', 'err');
+    xhr.send(fd);
+  } catch(e) {
+    setStatus('Error: ' + e, 'err');
+  }
+}
+
+(function(){
+  const dzVideo = document.getElementById('drop-zone-video');
+  const dzSub = document.getElementById('drop-zone-sub');
+  
+  if (dzVideo) {
+      dzVideo.addEventListener('dragover', e => { e.preventDefault(); dzVideo.classList.add('dragover'); });
+      dzVideo.addEventListener('dragleave', () => dzVideo.classList.remove('dragover'));
+      dzVideo.addEventListener('drop', e => {
+        e.preventDefault();
+        dzVideo.classList.remove('dragover');
+        const file = e.dataTransfer.files[0];
+        if (file) {
+          document.getElementById('file-input-video').files = e.dataTransfer.files;
+          onVideoFileChosen(document.getElementById('file-input-video'));
+        }
+      });
+  }
+  
+  if (dzSub) {
+      dzSub.addEventListener('dragover', e => { e.preventDefault(); dzSub.classList.add('dragover'); });
+      dzSub.addEventListener('dragleave', () => dzSub.classList.remove('dragover'));
+      dzSub.addEventListener('drop', e => {
+        e.preventDefault();
+        dzSub.classList.remove('dragover');
+        const file = e.dataTransfer.files[0];
+        if (file) {
+          document.getElementById('file-input-sub').files = e.dataTransfer.files;
+          onSubFileChosen(document.getElementById('file-input-sub'));
+        }
+      });
+  }
+})();
+
+/* ═══════════════════════ ACTIONS ═══════════════════════ */
+let loadVideoPollInterval = null;
+
+async function loadVideo() {
+  const pathVal = document.getElementById('video-path').value.trim();
+  const subVal  = document.getElementById('sub-path').value.trim();
+  const ytVal   = document.getElementById('yt-url').value.trim();
+  if (!pathVal && !ytVal) { alert(currentLang === 'pl' ? 'Wybierz wideo lub podaj URL YouTube.' : 'Select video or enter YouTube URL.'); return; }
+  
+  setStatus(i18n[currentLang].statusLoading, 'busy');
+  document.getElementById('btn-load').style.display = 'none';
+  document.getElementById('btn-cancel-load').style.display = 'inline-flex';
+
+  await syncToServer();
+
+  const subRole = document.querySelector('input[name="sub-role"]:checked')?.value || 'original';
+
+  const body = {
+    video_path: pathVal,
+    subtitles_path: subVal,
+    yt_url:     ytVal,
+    source_lang: document.getElementById('source-lang').value,
+    target_lang: document.getElementById('target-lang').value,
+    whisper_model: document.getElementById('whisper-model').value,
+    hf_token: document.getElementById('hf-token').value,
+    subtitles_role: subRole,
+  };
+
+  
+  await fetch('/api/load_video', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  
+  let attempts = 0;
+  loadVideoPollInterval = setInterval(async () => {
+    const r = await fetch('/api/subtitles');
+    const d = await r.json();
+    if (d.rows && d.rows.length) {
+      rows = d.rows;
+      renderTable();
+      stopLoadVideoPolling();
+      setStatus(currentLang === 'pl' ? `Załadowano ${rows.length} napisów.` : `Loaded ${rows.length} subtitles.`, 'ok');
+      
+
+      if (pathVal && !uploadedVideoPath) {
+        const vp = document.getElementById('video-player');
+        vp.src = 'file://' + pathVal;
+        vp.style.display = 'block';
+        document.getElementById('video-placeholder').style.display = 'none';
+      }
+    }
+    if (++attempts > 300) stopLoadVideoPolling();
+  }, 2000);
+}
+
+function stopLoadVideoPolling() {
+  if (loadVideoPollInterval) {
+    clearInterval(loadVideoPollInterval);
+    loadVideoPollInterval = null;
+  }
+  document.getElementById('btn-load').style.display = 'inline-flex';
+  document.getElementById('btn-cancel-load').style.display = 'none';
+}
+
+async function cancelLoadVideo() {
+  await fetch('/api/load_video/cancel', { method: 'POST' });
+  stopLoadVideoPolling();
+  setStatus('Cancelled.', '');
+}
+
+
+let translatePollInterval = null;
+
+async function translateAll() {
+  if (!rows.length) { alert(currentLang === 'pl' ? 'Wczytaj najpierw wideo.' : 'Please load video first.'); return; }
+  
+  setStatus(currentLang === 'pl' ? 'Tłumaczenie w toku...' : 'Translating...', 'busy');
+  document.getElementById('btn-translate').style.display = 'none';
+  document.getElementById('btn-cancel-translate').style.display = 'inline-flex';
+  
+  await syncToServer();
+
+  const body = {
+    model: document.getElementById('ollama-model').value,
+    prompt: document.getElementById('prompt-textarea').value,
+    temperature: parseFloat(document.getElementById('temperature').value),
+  };
+  await fetch('/api/translate', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+
+  let attempts = 0;
+  translatePollInterval = setInterval(async () => {
+    attempts++;
+    try {
+      const rs = await fetch('/api/translate/status');
+      const ds = await rs.json();
+      const prog = ds.total > 0 ? Math.round(ds.progress / ds.total * 100) : 0;
+      
+      setStatus(currentLang === 'pl' ? `Tłumaczenie: ${ds.progress}/${ds.total} linii (${prog}%)...` : `Translating: ${ds.progress}/${ds.total} lines (${prog}%)...`, 'busy');
+
+      const rt = await fetch('/api/subtitles');
+      const dt = await rt.json();
+      if (dt.rows && dt.rows.length) {
+        rows = dt.rows;
+        renderTable();
+      }
+
+      if (ds.done || attempts > 600) {
+        stopTranslatePolling();
+        setStatus(currentLang === 'pl' ? `Tłumaczenie zakończone — ${rows.length} linii.` : `Translation finished — ${rows.length} lines.`, 'ok');
+      }
+    } catch(e) {
+      if (attempts > 600) stopTranslatePolling();
+    }
+  }, 2500);
+}
+
+function stopTranslatePolling() {
+  if (translatePollInterval) {
+    clearInterval(translatePollInterval);
+    translatePollInterval = null;
+  }
+  document.getElementById('btn-translate').style.display = 'inline-flex';
+  document.getElementById('btn-cancel-translate').style.display = 'none';
+}
+
+async function cancelTranslation() {
+  await fetch('/api/translate/cancel', { method: 'POST' });
+  stopTranslatePolling();
+  setStatus('Cancelled.', '');
+}
+
+async function analyzeContext() {
+  setStatus('⏳ Analyzing context...', 'busy');
+  await syncToServer();
+  
+  await fetch('/api/analyze_context', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ model: document.getElementById('ollama-model').value })
+  });
+  
+  const poll = setInterval(async () => {
+    const r = await fetch('/api/context');
+    const d = await r.json();
+    if (d.context) {
+      const box = document.getElementById('context-output');
+      box.style.display = 'block';
+      box.textContent = d.context;
+      clearInterval(poll);
+      setStatus('✅ Context analyzed.', 'ok');
+    }
+  }, 3000);
+}
+
+
+let dubbingPollInterval = null;
+
+async function generateDubbing() {
+
+  await syncToServer();
+
+
+  const hasTranslations = rows.some(r => r.Translation && r.Translation.trim());
+  if (!hasTranslations) {
+    const msg = currentLang === 'pl'
+      ? '⚠️ Brak tłumaczeń! Najpierw przetłumacz napisy (AI lub ręcznie), a potem generuj dubbing.'
+      : '⚠️ No translations found! Please translate subtitles first (AI or manually) before generating dubbing.';
+    setStatus(msg, 'err');
+    return;
+  }
+
+  setStatus(i18n[currentLang].statusProcessing, 'busy');
+  document.getElementById('btn-generate').style.display = 'none';
+  document.getElementById('btn-cancel-generate').style.display = 'inline-flex';
+
+  const autoAccept = document.getElementById('auto-accept')?.checked ?? true;
+
+  const body = {
+    target_lang: document.getElementById('dub-lang').value,
+    voice:       document.getElementById('voice-select').value,
+    tts_engine:  document.getElementById('tts-engine').value,
+    keep_bg:     document.getElementById('keep-bg').checked,
+    hardsub:     document.getElementById('hardsub').checked,
+    validation_model: document.getElementById('validation-model').value,
+    output_video_path: document.getElementById('output-video-path').value,
+    auto_accept: autoAccept,
+    auto_retry_count: parseInt(document.getElementById('auto-retry-count')?.value || 10),
+    audio_enhance: document.getElementById('audio-enhance')?.checked || false,
+    enhance_method: document.getElementById('enhance-method')?.value || 'dsp_denoise',
+  };
+  
+  await fetch('/api/generate_dubbing', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+
+  
+
+  let attempts = 0;
+  dubbingPollInterval = setInterval(async () => {
+    attempts++;
+
+    const logsContainer = document.getElementById('log-body');
+    if (logsContainer && (logsContainer.textContent.includes('Sukces! Gotowy plik wideo') || logsContainer.textContent.includes('FFmpeg failed'))) {
+      stopDubbingPolling();
+      if (logsContainer.textContent.includes('Sukces')) {
+        setStatus(i18n[currentLang].statusSuccess, 'ok');
+      } else {
+        setStatus(i18n[currentLang].statusError, 'err');
+      }
+    }
+    if (attempts > 900) stopDubbingPolling();
+  }, 3000);
+}
+
+function stopDubbingPolling() {
+  if (dubbingPollInterval) {
+    clearInterval(dubbingPollInterval);
+    dubbingPollInterval = null;
+  }
+  document.getElementById('btn-generate').style.display = 'inline-flex';
+  document.getElementById('btn-cancel-generate').style.display = 'none';
+}
+
+async function cancelGenerateDubbing() {
+  await fetch('/api/generate_dubbing/cancel', { method: 'POST' });
+  stopDubbingPolling();
+  setStatus('Cancelled.', '');
+}
+
+function exportSRT() {
+  window.location.href = '/api/export_srt';
+}
+
+function downloadVideo() {
+  window.location.href = '/api/download_video';
+}
+
+/* ─── RESET APP ─── */
+async function resetApp() {
+  if (!confirm(currentLang === 'pl' ? "Czy na pewno chcesz usunąć wczytane wideo i wszystkie napisy? Zmiany zostaną bezpowrotnie utracone." : "Are you sure you want to clear video and subtitles? All changes will be lost.")) return;
+  
+  setStatus('🔄 Resetowanie...', 'busy');
+  await fetch('/api/reset', { method:'POST' });
+  
+  rows = [];
+  selIdx = -1;
+  uploadedVideoPath = '';
+  renderTable();
+  clearEdit();
+  
+  const vp = document.getElementById('video-player');
+  vp.style.display = 'none';
+  vp.src = '';
+  document.getElementById('video-placeholder').style.display = 'flex';
+  
+  document.getElementById('file-input-video').value = '';
+  document.getElementById('dz-filename-video').textContent = '';
+  document.getElementById('file-input-sub').value = '';
+  document.getElementById('dz-filename-sub').textContent = '';
+  document.getElementById('video-path').value = '';
+  document.getElementById('sub-path').value = '';
+  document.getElementById('yt-url').value = '';
+  document.getElementById('output-video-path').value = '';
+  document.getElementById('context-output').style.display = 'none';
+  document.getElementById('context-output').textContent = '';
+  
+  document.getElementById('log-body').innerHTML = '';
+  logCount = 0;
+  document.getElementById('log-badge').textContent = '0';
+  
+  setStatus(i18n[currentLang].statusReady, 'ok');
+}
+
+/* ─── INIT ─── */
+window.addEventListener('DOMContentLoaded', () => {
+  if (!currentLang) {
+    document.getElementById('lang-modal').style.display = 'flex';
+  } else {
+    applyLanguage(currentLang);
+    showProjectManager();
+  }
+  
+
+  checkOllama();
+  
+  document.getElementById('video-path').addEventListener('keydown', e => {
+    if (e.key === 'Enter') loadVideo();
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,2 @@
+[console_scripts]
+qwen-tts-demo = qwen_tts.cli.demo:main
