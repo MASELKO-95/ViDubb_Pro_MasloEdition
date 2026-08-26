@@ -1,0 +1,35 @@
+# Core
+pyannote.audio==3.3.2
+speechbrain==1.0.2
+audio-separator==0.24.1
+yt-dlp
+groq==0.13.0
+python-dotenv
+
+# Audio/TTS
+TTS==0.22.0
+openai-whisper==20240930
+pydub
+ffmpeg-python
+
+# CV/Face
+deepface==0.0.93
+opencv-python
+scikit-image
+
+# ML/Utils
+numpy==1.26.4
+scipy==1.11.4
+transformers==4.36.2
+torch>=2.6.0
+torchaudio>=2.6.0
+torchvision>=0.21.0
+protobuf==3.19.6
+requests>=2.31.0
+nltk==3.8.1
+ascii-magic
+
+# Optional
+gradio==5.8.0
+numba==0.60.0
+gruut==2.2.3
