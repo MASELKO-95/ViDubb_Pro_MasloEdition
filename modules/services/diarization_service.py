@@ -1,20 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Speaker diarization service
-
-Primary:
-    Pyannote Speaker Diarization
-
-Fallback:
-    SpeechBrain ECAPA-TDNN + Agglomerative Clustering + Post-processing
-
-Input:
-    video/audio file + Whisper timestamps
-
-Output:
-    list of speaker labels, one label per timestamp
-"""
-
 import os
 import gc
 import numpy as np
@@ -37,14 +20,16 @@ ECAPA_CACHE_DIR = os.path.join(
     "ecapa_cache"
 )
 
-# ECAPA-TDNN expects 16 kHz mono audio
 ECAPA_SAMPLE_RATE = 16000
 
-# Maximum number of speakers when automatic detection is used (zwiększone dla seriali)
+
 DEFAULT_MAX_SPEAKERS = 20
 
-# Minimum useful segment length for ECAPA
-MIN_SEGMENT_MS = 300
+# ECAPA is unreliable on subtitle fragments lasting only a few hundred ms.
+# Give short utterances additional local context before embedding them.
+MIN_SEGMENT_MS = 1200
+EMBEDDING_CONTEXT_MS = 450
+MAX_ECAPA_SEGMENT_MS = 12_000
 
 
 # ============================================================
@@ -55,6 +40,11 @@ def _get_device() -> str:
     if torch.cuda.is_available():
         return "cuda"
     return "cpu"
+
+
+def _get_speechbrain_device(preferred_device: str) -> str:
+    """Prefer CUDA whenever it is available; callers handle an OOM fallback."""
+    return "cuda" if preferred_device == "cuda" and torch.cuda.is_available() else "cpu"
 
 
 def _cleanup_gpu():
@@ -189,48 +179,68 @@ def _extract_embeddings(
     from speechbrain.inference.speaker import EncoderClassifier
 
     state.add_log("  🧠 Ładowanie modelu ECAPA-TDNN (SpeechBrain)...")
-    classifier = EncoderClassifier.from_hparams(
-        source="speechbrain/spkrec-ecapa-voxceleb",
-        run_opts={"device": device},
-        savedir=ECAPA_CACHE_DIR
-    )
-
-    audio = _prepare_audio(wav_path)
+    classifier = None
+    tensor = None
+    embedding = None
     embeddings = []
+    try:
+        classifier = EncoderClassifier.from_hparams(
+            source="speechbrain/spkrec-ecapa-voxceleb",
+            run_opts={"device": device},
+            savedir=ECAPA_CACHE_DIR
+        )
 
-    state.add_log(f"  📊 Generowanie embeddingów dla {len(timestamps)} segmentów...")
+        audio = _prepare_audio(wav_path)
+        state.add_log(f"  📊 Generating embeddings for {len(timestamps)} segments...")
 
-    for index, (start_ms, end_ms) in enumerate(timestamps):
-        start_ms = max(0, int(start_ms))
-        end_ms = max(start_ms, int(end_ms))
+        for index, (start_ms, end_ms) in enumerate(timestamps):
+            start_ms = max(0, int(start_ms))
+            end_ms = max(start_ms, int(end_ms))
 
-        if end_ms - start_ms < MIN_SEGMENT_MS:
-            center = (start_ms + end_ms) // 2
-            context = 500
-            start_ms = max(0, center - context)
-            end_ms = min(len(audio), center + context)
+            if end_ms - start_ms < MIN_SEGMENT_MS:
+                # Expand into nearby audio, but never cross the midpoint of a
+                # neighbouring subtitle. This avoids borrowing another actor.
+                left_limit = 0
+                right_limit = len(audio)
+                if index > 0:
+                    previous_end = int(timestamps[index - 1][1])
+                    left_limit = max(0, (previous_end + start_ms) // 2)
+                if index + 1 < len(timestamps):
+                    next_start = int(timestamps[index + 1][0])
+                    right_limit = min(len(audio), (end_ms + next_start) // 2)
 
-        segment = audio[start_ms:end_ms]
+                start_ms = max(left_limit, start_ms - EMBEDDING_CONTEXT_MS)
+                end_ms = min(right_limit, end_ms + EMBEDDING_CONTEXT_MS)
 
-        if len(segment) <= 0:
-            embeddings.append(np.zeros(192, dtype=np.float32))
-            continue
+            # A malformed or unusually long subtitle event must not create a
+            # massive ECAPA tensor. A centered 12-second voice sample is enough.
+            if end_ms - start_ms > MAX_ECAPA_SEGMENT_MS:
+                center = (start_ms + end_ms) // 2
+                half_window = MAX_ECAPA_SEGMENT_MS // 2
+                start_ms = max(0, center - half_window)
+                end_ms = min(len(audio), start_ms + MAX_ECAPA_SEGMENT_MS)
 
-        samples = np.asarray(segment.get_array_of_samples(), dtype=np.float32)
-        samples /= 32768.0
-        tensor = torch.from_numpy(samples).unsqueeze(0).to(device)
+            segment = audio[start_ms:end_ms]
+            if len(segment) <= 0:
+                embeddings.append(np.zeros(192, dtype=np.float32))
+                continue
 
-        with torch.no_grad():
-            embedding = classifier.encode_batch(tensor)
+            samples = np.asarray(segment.get_array_of_samples(), dtype=np.float32)
+            samples /= 32768.0
+            tensor = torch.from_numpy(samples).unsqueeze(0).to(device)
+            with torch.inference_mode():
+                embedding = classifier.encode_batch(tensor)
+            embeddings.append(
+                embedding.squeeze().detach().cpu().numpy().astype(np.float32)
+            )
+            del tensor, embedding
+            tensor = embedding = None
 
-        embedding = embedding.squeeze().detach().cpu().numpy().astype(np.float32)
-        embeddings.append(embedding)
-
-        if (index + 1) % 20 == 0 or index == len(timestamps) - 1:
-            state.add_log(f"    ✓ {index + 1}/{len(timestamps)} embeddingów")
-
-    del classifier
-    _cleanup_gpu()
+            if (index + 1) % 20 == 0 or index == len(timestamps) - 1:
+                state.add_log(f"    ✓ {index + 1}/{len(timestamps)} embeddings")
+    finally:
+        del tensor, embedding, classifier
+        _cleanup_gpu()
 
     embeddings = np.asarray(embeddings, dtype=np.float32)
 
@@ -272,11 +282,12 @@ def _auto_cluster(
 
     for k in range(2, max_k + 1):
         try:
-            # 'complete' linkage bardziej agresywnie rozdziela klastry
+            # Average linkage tolerates emotion/pitch changes better than
+            # complete linkage, which tended to split one actor into clusters.
             clusterer = AgglomerativeClustering(
                 n_clusters=k,
                 metric="cosine",
-                linkage="complete"
+                linkage="average"
             )
             labels = clusterer.fit_predict(embeddings_norm)
 
@@ -302,7 +313,7 @@ def _auto_cluster(
 
 
 # ============================================================
-# POST-PROCESSING (ROZDZIELANIE SZYBKICH DIALOGÓW)
+# POST-PROCESSING FOR RAPID DIALOGUE CHANGES
 # ============================================================
 
 def _postprocess_diarization(
@@ -311,38 +322,35 @@ def _postprocess_diarization(
     timestamps: list,
     threshold_ms: int = 1500
 ) -> list:
+    """Apply conservative corrections without inventing new speakers.
+
+    ECAPA similarity between two consecutive subtitle-sized samples can fall
+    sharply because of emotion, shouting, background music or a very short
+    utterance. Creating a new label from that local difference caused one
+    actor to become many fake speakers. The global clustering step above is
+    responsible for deciding how many people exist; post-processing must
+    preserve that decision.
     """
-    Rozdziela segmenty, które są blisko siebie w czasie,
-    ale mają różne głosy (niskie podobieństwo embeddingów),
-    aby uniknąć łączenia szybkich dialogów w jeden głos.
-    """
-    if len(labels) <= 1:
-        return labels
+    if len(labels) <= 2:
+        return list(labels)
 
-    from sklearn.metrics.pairwise import cosine_similarity
+    improved_labels = list(labels)
 
-    improved_labels = labels.copy()
+    # Remove only an isolated one-line flip between two equal neighbours.
+    # This reduces obvious jitter and never increases the number of speakers.
+    for index in range(1, len(labels) - 1):
+        previous_label = labels[index - 1]
+        current_label = labels[index]
+        next_label = labels[index + 1]
+        previous_end = timestamps[index - 1][1]
+        next_start = timestamps[index + 1][0]
 
-    for i in range(1, len(labels)):
-        prev_start, prev_end = timestamps[i-1]
-        curr_start, curr_end = timestamps[i]
-
-        # Sprawdź czy segmenty są blisko siebie w czasie (np. przerwa < 1.5s)
-        gap = curr_start - prev_end
-
-        if gap <= threshold_ms:
-            # Sprawdź czy embeddingi są różne
-            emb_prev = embeddings[i-1].reshape(1, -1)
-            emb_curr = embeddings[i].reshape(1, -1)
-            similarity = cosine_similarity(emb_prev, emb_curr)[0][0]
-
-            # Jeśli podobieństwo < 0.65, to prawdopodobnie różne osoby,
-            # ale clustering mógł je połączyć. Rozdziel je.
-            if similarity < 0.65 and labels[i] == labels[i-1]:
-                existing_labels = set(improved_labels)
-                new_label = max(existing_labels) + 1
-                improved_labels[i] = new_label
-                state.add_log(f"    🔀 Rozdzielono segment {i} (gap={gap}ms, sim={similarity:.2f})")
+        if (
+            previous_label == next_label
+            and current_label != previous_label
+            and next_start - previous_end <= threshold_ms * 2
+        ):
+            improved_labels[index] = previous_label
 
     return improved_labels
 
@@ -378,7 +386,7 @@ def _diarize_speechbrain(
 
     embeddings = _extract_embeddings(wav_path, timestamps, device)
 
-    if num_speakers is not None and num_speakers > 1:
+    if num_speakers is not None and num_speakers > 0:
         from sklearn.cluster import AgglomerativeClustering
         from sklearn.preprocessing import normalize
 
@@ -392,14 +400,14 @@ def _diarize_speechbrain(
             clusterer = AgglomerativeClustering(
                 n_clusters=num_speakers,
                 metric="cosine",
-                linkage="complete"  # Zmienione z "average" na "complete"
+                linkage="average",
             )
             labels = clusterer.fit_predict(normalize(embeddings)).tolist()
             state.add_log(f"  🎯 Użyto wymuszonej liczby speakerów: {num_speakers}")
     else:
         labels = _auto_cluster(embeddings, max_speakers=DEFAULT_MAX_SPEAKERS)
 
-    # >>> KLUCZOWE: Post-processing dla szybkich dialogów <<<
+    # Smooth isolated assignment jitter without creating extra speakers.
     labels = _postprocess_diarization(labels, embeddings, timestamps, threshold_ms=1500)
 
     speakers = _labels_to_names(labels)
@@ -433,7 +441,7 @@ def perform_diarization(
         state.add_log(f"  ❌ Nie udało się wyodrębnić audio: {e}")
         return ["Unknown"] * len(timestamps)
 
-    # PATH 1: PYANNOTE
+
     if hf_token and hf_token.strip():
         pipeline = None
         try:
@@ -464,19 +472,31 @@ def perform_diarization(
         state.add_log("  ⚠️ Brak tokenu HuggingFace.")
         state.add_log("  🔄 Używam lokalnego SpeechBrain jako fallback.")
 
-    # PATH 2: SPEECHBRAIN ECAPA
-    try:
-        speakers = _diarize_speechbrain(DIAR_WAV_PATH, timestamps, device, num_speakers)
 
-        if len(speakers) != len(timestamps):
-            raise RuntimeError(
-                f"Fallback zwrócił nieprawidłową liczbę etykiet: "
-                f"{len(speakers)} zamiast {len(timestamps)}."
+    speechbrain_device = _get_speechbrain_device(device)
+    attempts = [speechbrain_device]
+    if speechbrain_device == "cuda":
+        attempts.append("cpu")
+
+    for attempt_device in attempts:
+        try:
+            state.add_log(f"  🖥️ ECAPA device: {attempt_device}.")
+            speakers = _diarize_speechbrain(
+                DIAR_WAV_PATH, timestamps, attempt_device, num_speakers
             )
+            if len(speakers) != len(timestamps):
+                raise RuntimeError(
+                    f"Fallback returned {len(speakers)} labels for "
+                    f"{len(timestamps)} timestamps."
+                )
+            return speakers
+        except Exception as exc:
+            _cleanup_gpu()
+            if attempt_device == "cuda":
+                state.add_log(
+                    f"  ⚠️ ECAPA CUDA failed: {exc}. Retrying on CPU."
+                )
+                continue
+            state.add_log(f"  ❌ Local diarization failed: {exc}")
 
-        return speakers
-
-    except Exception as e:
-        state.add_log(f"  ❌ Lokalna diarization failed: {e}")
-        _cleanup_gpu()
-        return ["Unknown" for _ in timestamps]
+    return ["Unknown" for _ in timestamps]

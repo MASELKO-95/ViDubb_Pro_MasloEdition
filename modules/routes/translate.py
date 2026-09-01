@@ -1,21 +1,15 @@
-# -*- coding: utf-8 -*-
-"""
-Blueprint for Ollama translation and context analysis
-"""
 import gc
 import re
 import threading
 import requests
 import torch
-import pandas as pd
 from flask import Blueprint, jsonify, request
 from modules.state import state
-from modules.utils.time_utils import format_time
 
 translate_bp = Blueprint('translate', __name__)
 
 def _post_ai_generate(json_data: dict, custom_endpoint: str = None, timeout: int = 120):
-    """Resilient AI generation API helper supporting Ollama and OpenAI/llama.cpp endpoints"""
+
     urls_to_try = []
     if custom_endpoint and custom_endpoint.strip():
         ep = custom_endpoint.strip().rstrip('/')
@@ -73,67 +67,94 @@ def _post_ai_generate(json_data: dict, custom_endpoint: str = None, timeout: int
     return ""
 
 def clean_translation_output(raw_text: str, target_lang: str = "Polish") -> str:
-    """
-    Cleans AI model translation output:
-    - Removes AI introductory preambles (Translation:, Oto tłumaczenie:, etc.)
-    - Removes trailing / inline bracketed commentary e.g. (zakończenie), (koniec), (uwaga: ...), [dopisek]
-    - Removes residual untranslated CJK/Cyrillic sound particles (e.g. フу, フッ) when translating to Polish/Latin
-    - Strips quote wrappers and extra whitespace
-    - Removes stray numbers and Japanese instructional phrases
-    - Preserves proper sentence capitalization
-    """
+
     if not raw_text:
         return ""
 
-    # 1. Take first non-empty line
-    lines = [l.strip() for l in raw_text.strip().split('\n') if l.strip()]
+
+    lines = [line.strip() for line in raw_text.strip().splitlines() if line.strip()]
     text = lines[0] if lines else ""
+    if not text:
+        return ""
 
-    # 2. Strip leading list markers (e.g. '1. ', '1) ', '- ')
-    text = re.sub(r'^[\*\-\d\.\)\s]+', '', text)
 
-    # 3. Strip common AI prefixes
-    prefix_pattern = r'^(Translation|Translated|Tłumaczenie|Here is(\s+the)?\s+translation|Polish|Polski|Output|Wersja polska|Oto tłumaczenie|Odpowiedź|Dialog|Subtitles?|Line):\s*'
+    text = re.sub(r'^\s*(?:[\*\-•]\s+|\d{1,3}[\.\)]\s+)', '', text)
+
+    prefix_pattern = (
+        r'^(?:Translation|Translated|Tłumaczenie|'
+        r'Here is(?:\s+the)?\s+translation|Polish|Polski|Output|'
+        r'Wersja polska|Oto tłumaczenie|Odpowiedź|Dialog|Subtitles?|Line|'
+        r'翻訳|訳|翻译|翻譯|译文|譯文|答案|回答|번역|답변)'
+        r'\s*[:：]\s*'
+    )
     text = re.sub(prefix_pattern, '', text, flags=re.IGNORECASE)
-    text = re.sub(r'^[\*\-\d\.\)\s]+', '', text)
+    text = re.sub(r'^\s*(?:[\*\-•]\s+|\d{1,3}[\.\)]\s+)', '', text)
     text = re.sub(prefix_pattern, '', text, flags=re.IGNORECASE)
 
-    # 4. Strip surrounding quotes
-    text = text.strip('\"\'\`„”«»『』「」 \t\r\n')
 
-    # 5. Remove meta-commentary inside brackets / parentheses
-    meta_words = r'zakończenie|koniec|uwaga|dopisek|w domyśle|literal|literalnie|dosłownie|męski|żeński|l\.mn|tryb|forma|wskazówka|wyjaśnienie|odpowiedź|odp|note|explanation|meaning|literal|context|informal|formal|polski|polish|translation|translated|output|source|speaker'
-    text = re.sub(r'\s*[\(\[（](?:.*?(?:' + meta_words + r').*?)[\)\]）]\s*', '', text, flags=re.IGNORECASE)
+    text = text.strip('\"\'`„”«»『』「」《》〈〉“”‘’ \t\r\n')
 
-    # 6. Remove any trailing short bracketed content
-    text = re.sub(r'\s*[\(\[（][^\(\)\[\]]{1,40}[\)\]）]\s*$', '', text)
 
-    # 7. Clean foreign script leftovers if target is Latin based
-    is_latin_target = target_lang.lower() in ('polish', 'polski', 'pl', 'english', 'en', 'german', 'de', 'french', 'fr', 'spanish', 'es', 'italian', 'it', 'dutch', 'nl', 'czech', 'cs', 'turkish', 'tr')
+    meta_words = (
+        r'zakończenie|koniec|uwaga|dopisek|w domyśle|literal|literalnie|'
+        r'dosłownie|męski|żeński|l\.mn|tryb|forma|wskazówka|wyjaśnienie|'
+        r'odpowiedź|odp|note|explanation|meaning|context|informal|formal|'
+        r'polski|polish|translation|translated|output|source|speaker|'
+        r'注|説明|翻訳|訳注|备注|備註|说明|說明|번역|설명'
+    )
+    text = re.sub(
+        r'\s*[\(\[（【](?:.*?(?:' + meta_words + r').*?)[\)\]）】]\s*',
+        ' ',
+        text,
+        flags=re.IGNORECASE
+    )
+
+    target = str(target_lang or "").strip().lower()
+    latin_targets = {
+        'polish', 'polski', 'pl',
+        'english', 'en',
+        'german', 'de',
+        'french', 'fr',
+        'spanish', 'es',
+        'italian', 'it',
+        'dutch', 'nl',
+        'czech', 'cs',
+        'turkish', 'tr',
+    }
+    is_latin_target = target in latin_targets
+
     if is_latin_target:
-        # Strip leading foreign script characters and punctuation
-        text = re.sub(r'^[\u3040-\u30ff\u4e00-\u9fff\uac00-\ud7af\u0400-\u04ff\u0600-\u06ff\s,\-—:;]+', '', text)
-        # Strip trailing foreign script characters
-        text = re.sub(r'[\u3040-\u30ff\u4e00-\u9fff\uac00-\ud7af\u0400-\u04ff\u0600-\u06ff]+$', '', text)
-        # Strip isolated foreign characters inside the text
-        text = re.sub(r'(?<=\s)[\u3040-\u30ff\u4e00-\u9fff\uac00-\ud7af\u0400-\u04ff]+(?=\s)', '', text)
+        has_latin = bool(re.search(
+            r'[A-Za-zÀ-ÖØ-öø-ÿĄĆĘŁŃÓŚŹŻąćęłńóśźżČčŠšŽžŘřĎďŤťŇňĚě]',
+            text
+        ))
+        if has_latin:
+            text = re.sub(
+                r'(?:(?<=\s)|^)'
+                r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]'
+                r'{1,3}'
+                r'(?=\s|$)',
+                '',
+                text
+            )
 
-    # 8. Remove stray standalone numbers (e.g. "1")
-    text = re.sub(r'\b\d+\b', '', text)
 
-    # 9. Remove remaining Japanese/Korean/Chinese instruction blocks (continuous non-ASCII characters)
-    text = re.sub(r'[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]+', '', text)
+    text = re.sub(r'[ \t]{2,}', ' ', text).strip()
+    text = text.strip('\"\'`„”«»『』「」《》〈〉“”‘’ \t\r\n')
 
-    # 10. Final whitespace and quote cleanup
-    text = text.strip('\"\'\`„”«»『』「」 \t\r\n')
-    text = re.sub(r'\s{2,}', ' ', text).strip()
 
-    # Capitalize first letter if needed
-    if text and len(text) > 1 and text[0].islower() and not text.startswith(('...', 'http')):
+    if not any(ch.isalnum() for ch in text):
+        return ""
+
+    if (
+        is_latin_target
+        and len(text) > 1
+        and text[0].islower()
+        and not text.startswith(('...', 'http'))
+    ):
         text = text[0].upper() + text[1:]
 
     return text
-
 
 def translate_line_with_ollama(
     line: str,
@@ -147,7 +168,6 @@ def translate_line_with_ollama(
     context: str,
     custom_endpoint: str = None
 ) -> str:
-    """Helper to translate a single subtitle line via Ollama/llama.cpp with cleaning and anti-hallucination"""
     base_prompt = system_prompt.strip() or (
         f"You are a professional movie subtitle translator.\n"
         f"Source language: {detected_lang} (auto-detected by Whisper).\n"
@@ -177,7 +197,7 @@ def translate_line_with_ollama(
         try:
             if attempt == 0:
                 state.add_log(f"  [{i+1}/{total}] {line[:40]}...")
-            
+
             raw_text = _post_ai_generate(
                 json_data={
                     "model": model_name,
@@ -189,11 +209,10 @@ def translate_line_with_ollama(
                 timeout=120
             )
 
-            # Clean response text thoroughly
             first_line = clean_translation_output(raw_text, target_lang=tgt_lang)
 
             if not first_line:
-                state.add_log(f"  ⚠️ Pusta odpowiedź AI, ponawiam (próba {attempt+1}/{max_retries})...")
+                state.add_log(f"  ⚠️ Pusta lub tylko interpunkcyjna odpowiedź AI, ponawiam (próba {attempt+1}/{max_retries})...")
                 continue
 
             # Anti-hallucination checks
@@ -205,7 +224,7 @@ def translate_line_with_ollama(
             if tgt_len > (src_len * 5 + 30):
                 state.add_log(f"  🔁 Wykryto zbyt długą frazę ({src_len} vs {tgt_len} znaków). Ponawiam...")
                 continue
-                
+
             best_translation = first_line
             break
 
@@ -218,10 +237,10 @@ def translate_line_with_ollama(
 
 @translate_bp.route("/api/translate", methods=["POST"])
 def run_translation():
-    """Start asynchronous translation of all subtitles using Ollama"""
+
     if not state.active_project:
         return jsonify({"error": "Brak aktywnego projektu"}), 400
-        
+
     df = state.get_df()
     if df.empty:
         return jsonify({"error": "Nie wczytano żadnych napisów"}), 400
@@ -231,19 +250,18 @@ def run_translation():
     system_prompt = data.get("prompt", "")
     temperature = float(data.get("temperature", 0.1))
 
-    # Fallback to first available model if not specified
+
     if not model_name:
         from modules.app import get_ollama_models_list
         models = get_ollama_models_list()
         model_name = models[0] if models else "microai/suzume-llama3"
 
-    # Reset state attributes for progress tracking
+
     state.translate_done = False
     state.translate_total = len(df)
     state.translate_progress = 0
     state.cancel_flags["translate"] = False
 
-    # Store translation settings in active project
     state.active_project.ollama_model = model_name
     state.active_project.temperature = temperature
     state.active_project.prompt = system_prompt
@@ -256,11 +274,10 @@ def run_translation():
             tgt_lang = state.active_project.target_lang
             context = state.active_project.context
             ai_endpoint = getattr(state.active_project, "ai_endpoint", None)
-            
+
             state.add_log(f"🌐 Tłumaczenie {detected_lang}→{tgt_lang} | model={model_name} | {len(texts)} linii")
 
-            # Update subtitles in dataframe line by line
-            # Use subtitle objects to respect custom flags (e.g., Ignore)
+
             subtitles = state.active_project.subtitles
             total = len(subtitles)
             for i, item in enumerate(subtitles):
@@ -273,7 +290,7 @@ def run_translation():
                     state.translate_progress = i + 1
                     continue
 
-                # If fragment marked to be ignored (e.g., intro music), keep original without translation
+
                 if item.get("Ignore", False):
                     item["Translation"] = original_line
                     item["Edited"] = False
@@ -289,7 +306,7 @@ def run_translation():
                 if state.cancel_flags["translate"]:
                     break
 
-                # Save translation only if non-empty after cleaning
+
                 if translated and translated.strip():
                     item["Translation"] = translated
                     item["Edited"] = True
@@ -303,7 +320,7 @@ def run_translation():
                 state.translate_progress = i + 1
 
             state.add_log(f"✅ Tłumaczenie zakończone — przetworzono {state.translate_progress} linii.")
-            
+
             # Clean Ollama cache
             try:
                 _post_ai_generate({"model": model_name, "keep_alive": 0}, custom_endpoint=ai_endpoint, timeout=5)
@@ -328,19 +345,19 @@ def unload_ai_model(custom_endpoint: str = None):
     """Immediately unloads models from GPU VRAM (Ollama keep_alive=0) and frees PyTorch memory"""
     model_name = getattr(state.active_project, "ollama_model", "") if state.active_project else ""
     ep = custom_endpoint or (getattr(state.active_project, "ai_endpoint", None) if state.active_project else None)
-    
+
     urls = []
     if ep:
         urls.append(f"{ep.rstrip('/')}/api/generate")
     urls.extend(["http://127.0.0.1:11434/api/generate", "http://localhost:11434/api/generate"])
-    
+
     for url in urls:
         try:
             if model_name:
                 requests.post(url, json={"model": model_name, "keep_alive": 0}, timeout=2)
         except Exception:
             pass
-            
+
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
@@ -350,7 +367,7 @@ def unload_ai_model(custom_endpoint: str = None):
 
 @translate_bp.route("/api/translate/status", methods=["GET"])
 def get_translate_status():
-    """Return status of currently running translation task"""
+
     return jsonify({
         "done": state.translate_done,
         "progress": state.translate_progress,
@@ -371,17 +388,17 @@ def cancel_translation():
 
 @translate_bp.route("/api/analyze_context", methods=["POST"])
 def analyze_context_api():
-    """Analyze subtitles scene/character context asynchronously"""
+
     if not state.active_project:
         return jsonify({"error": "Brak aktywnego projektu"}), 400
-        
+
     df = state.get_df()
     if df.empty:
         return jsonify({"error": "Nie wczytano żadnych napisów"}), 400
 
     data = request.get_json() or {}
     model_name = data.get("model", "")
-    
+
     if not model_name:
         from modules.app import get_ollama_models_list
         models = get_ollama_models_list()
@@ -393,10 +410,10 @@ def analyze_context_api():
             src_lang = state.active_project.source_lang
             ai_endpoint = getattr(state.active_project, "ai_endpoint", None)
             state.add_log(f"🔍 Rozpoczęcie analizy kontekstu wideo ({len(texts)} linii)...")
-            
+
             context_notes = []
             max_lines_per_batch = 150
-            
+
             for i in range(0, len(texts), max_lines_per_batch):
                 batch = texts[i:i + max_lines_per_batch]
                 batch_text = "\n".join([f"[{j + 1}] {line}" for j, line in enumerate(batch)])
@@ -417,11 +434,11 @@ def analyze_context_api():
                 except Exception as e:
                     state.add_log(f"  ❌ Błąd analizy kontekstu: {e}")
                     context_notes.append("")
-                    
+
             state.active_project.context = "\n".join(context_notes)
             state.active_project.save()
             state.add_log("✅ Analiza kontekstu zakończona sukcesem.")
-            
+
             # Clean Ollama cache
             try:
                 _post_ai_generate({"model": model_name, "keep_alive": 0}, custom_endpoint=ai_endpoint, timeout=5)
@@ -431,7 +448,7 @@ def analyze_context_api():
             gc.collect()
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
-                
+
         except Exception as e:
             state.add_log(f"❌ Błąd podczas analizy kontekstu: {e}")
 

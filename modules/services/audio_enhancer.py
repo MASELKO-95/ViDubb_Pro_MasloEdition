@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Audio Quality Enhancer & Restoration Service
-============================================
-Provides voice enhancement, noise suppression, de-essing, dynamic normalization,
-and architecture placeholders for neural speech restoration models (DeepFilterNet, Resemble-Enhance).
-"""
 import os
 import subprocess
 from modules.state import state
@@ -14,10 +7,6 @@ def enhance_audio(
     output_path: str = None,
     method: str = "dsp_denoise"
 ) -> str:
-    """
-    Enhance speech audio quality using chosen restoration method.
-    Returns the path to the enhanced audio file.
-    """
     if not input_path or not os.path.exists(input_path):
         state.add_log(f"  ⚠️ Audio Enhancer: Plik wejściowy nie istnieje: {input_path}")
         return input_path
@@ -30,7 +19,7 @@ def enhance_audio(
 
     try:
         if method == "broadcast_voice":
-            # Vocal warmth, highpass rumble cut, de-esser, gentle presence boost, and dynamic audio normalization
+
             audio_filter = (
                 "highpass=f=80,"
                 "lowpass=f=13000,"
@@ -41,8 +30,7 @@ def enhance_audio(
                 "dynaudnorm=f=120:g=15:m=8:r=0.9"
             )
         elif method == "neural_enhance":
-            # Neural enhancement placeholder (DeepFilterNet / Resemble-Enhance)
-            # Falls back to high-grade DSP denoise if neural dependencies are not yet installed
+
             state.add_log("  🤖 Moduł neuronowej restauracji głosu (DeepFilterNet/Resemble)...")
             audio_filter = (
                 "highpass=f=75,"
@@ -51,7 +39,7 @@ def enhance_audio(
                 "loudnorm=I=-16:TP=-1.5:LRA=9"
             )
         else:
-            # Default "dsp_denoise": Clean de-rumble, noise reduction, and level normalization
+
             audio_filter = (
                 "highpass=f=70,"
                 "lowpass=f=14000,"

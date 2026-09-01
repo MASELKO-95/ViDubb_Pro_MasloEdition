@@ -1,7 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Global state and project database management
-"""
 import os
 import json
 import time
@@ -18,6 +14,7 @@ class Project:
         self.target_lang = "Polish"
         self.whisper_model = "turbo"
         self.hf_token = ""
+        self.num_speakers = 0
         self.ollama_model = ""
         self.temperature = 0.1
         self.prompt = "You are a professional movie subtitle translator. Translate from {source_lang} to {target_lang}. Return ONLY the direct dialogue line translation. NEVER include notes, brackets, parentheses (e.g. no (zakończenie)), explanations, or untranslated characters. Do NOT wrap output in quotes."
@@ -50,6 +47,7 @@ class Project:
             "target_lang": self.target_lang,
             "whisper_model": self.whisper_model,
             "hf_token": self.hf_token,
+            "num_speakers": self.num_speakers,
             "ollama_model": self.ollama_model,
             "temperature": self.temperature,
             "prompt": self.prompt,
@@ -80,6 +78,7 @@ class Project:
         self.target_lang = data.get("target_lang", "Polish")
         self.whisper_model = data.get("whisper_model", "turbo")
         self.hf_token = data.get("hf_token", "")
+        self.num_speakers = max(0, min(20, int(data.get("num_speakers", 0) or 0)))
         self.ollama_model = data.get("ollama_model", "")
         self.temperature = data.get("temperature", 0.1)
         self.prompt = data.get("prompt", self.prompt)

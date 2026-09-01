@@ -1,7 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Time conversion and parsing utilities
-"""
 from datetime import timedelta
 
 def format_time(ms: int) -> str:

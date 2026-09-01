@@ -1,11 +1,4 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Diagnostics script for testing TTS engines (Edge-TTS and XTTS-v2) on the system.
-Tests Polish, English, and Japanese.
-"""
 import os
-import sys
 import subprocess
 import shutil
 
@@ -21,7 +14,7 @@ def check_edge_tts():
     else:
         log(f"✅ Found edge-tts at: {edge_path}")
 
-    # Test PL
+    # Verify a native Polish voice.
     log("Testing Edge-TTS with Polish...")
     try:
         res = subprocess.run([
@@ -35,7 +28,7 @@ def check_edge_tts():
     except Exception as e:
         log(f"❌ Polish Edge-TTS crashed: {e}")
 
-    # Test JA
+    # Verify a native Japanese voice.
     log("Testing Edge-TTS with Japanese...")
     try:
         res = subprocess.run([
@@ -49,7 +42,7 @@ def check_edge_tts():
     except Exception as e:
         log(f"❌ Japanese Edge-TTS crashed: {e}")
     
-    # Test Polish voice with Japanese text (user's error case)
+    # Reproduce the cross-language input that previously caused failures.
     log("Testing Edge-TTS Polish voice with Japanese text...")
     try:
         res = subprocess.run([
@@ -57,7 +50,8 @@ def check_edge_tts():
         ], capture_output=True, text=True)
         if res.returncode == 0:
             log("✅ Edge-TTS processed Japanese text with Polish voice (though it might sound weird/silent).")
-            if os.path.exists("test_edge_bad.mp3"): os.remove("test_edge_bad.mp3")
+            if os.path.exists("test_edge_bad.mp3"):
+                os.remove("test_edge_bad.mp3")
         else:
             log(f"⚠️ Edge-TTS failed Polish voice + Japanese text as expected: {res.stderr.strip()}")
     except Exception as e:

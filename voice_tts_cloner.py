@@ -1,10 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Voice Cloner with XTTS-v2 optimized for 8GB VRAM
-Run standalone: python voice_tts_cloner.py
-"""
-
 import os
 import gc
 import torch
@@ -13,41 +6,41 @@ import subprocess
 from pydub import AudioSegment
 from pydub.silence import detect_nonsilent
 import tempfile
-import numpy as np
+# XTTS compatibility setup must run before importing TTS.
+# ruff: noqa: E402
 
 # ====================== XTTS SAFE FIX ======================
 from torch.serialization import add_safe_globals
 
-print("🔧 Stosowanie PyTorch safe globals fix dla XTTS...")
+print("🔧 Applying the PyTorch safe-globals compatibility fix for XTTS...")
 
 try:
     from TTS.tts.configs.xtts_config import XttsConfig
-    from TTTs.tts.configs.shared_configs import BaseDatasetConfig
+    from TTS.tts.configs.shared_configs import BaseDatasetConfig
     from TTS.tts.models.xtts import XttsAudioConfig, XttsArgs
     from TTS.tts.utils.speakers import SpeakerManager
 
     add_safe_globals([XttsConfig, BaseDatasetConfig, XttsAudioConfig, XttsArgs, SpeakerManager])
-    print("✅ Klasy XTTS dodane do safelisty.")
+    print("✅ Added XTTS classes to the safe-globals list.")
 except Exception as e:
-    print(f"⚠️ Nie udało się dodać klas XTTS do safelisty: {e}")
-    print("   Używam awaryjnego nadpisania torch.load.")
-    import torch
+    print(f"⚠️ Could not add XTTS classes to the safe-globals list: {e}")
+    print("   Falling back to a torch.load compatibility wrapper.")
     original_load = torch.load
     def safe_load(*args, **kwargs):
         kwargs['weights_only'] = False
         return original_load(*args, **kwargs)
     torch.load = safe_load
 
-# Import TTS po fixie
+# Import TTS only after applying the compatibility fix.
 from TTS.api import TTS
 
-# Import separatora do usuwania tła
+# Optional separator used to remove background audio.
 try:
     from audio_separator.separator import Separator
     separator_available = True
 except ImportError:
     separator_available = False
-    print("⚠️ audio-separator nie zainstalowane – usuwanie tła będzie niedostępne.")
+    print("⚠️ audio-separator is not installed; background removal is unavailable.")
 
 # ========================= CONFIG =========================
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -62,13 +55,8 @@ if DEVICE == "cuda":
 
 # ========================= PREPROCESSING =========================
 def trim_silence(audio_path, silence_thresh=-50, min_silence_len=500, padding=200):
-    """
-    Wycina ciszę z początku i końca pliku audio.
-    Zwraca ścieżkę do przyciętego pliku tymczasowego.
-    """
     print("✂️ Wycinanie ciszy...")
     audio = AudioSegment.from_file(audio_path)
-    # Wykryj nie-ciche fragmenty
     nonsilent_ranges = detect_nonsilent(audio, min_silence_len=min_silence_len, silence_thresh=silence_thresh)
     if len(nonsilent_ranges) == 0:
         print("⚠️ Nie wykryto mowy – zwracam oryginał.")
@@ -84,10 +72,7 @@ def trim_silence(audio_path, silence_thresh=-50, min_silence_len=500, padding=20
     return out_path
 
 def remove_background(audio_path, model_name="UVR-MDX-NET-Inst_HQ_3.onnx"):
-    """
-    Usuwa tło (muzykę, szumy) z pliku audio, zostawiając tylko wokal.
-    Wymaga biblioteki audio-separator.
-    """
+
     if not separator_available:
         print("⚠️ audio-separator niedostępne – pomijam usuwanie tła.")
         return audio_path
@@ -96,7 +81,6 @@ def remove_background(audio_path, model_name="UVR-MDX-NET-Inst_HQ_3.onnx"):
     separator = Separator()
     separator.load_model(model_filename=model_name)
 
-    # Separator zwraca listę plików – znajdź ten z wokalem
     output_files = separator.separate(audio_path)
     vocal_file = None
     for f in output_files:
@@ -104,7 +88,7 @@ def remove_background(audio_path, model_name="UVR-MDX-NET-Inst_HQ_3.onnx"):
             vocal_file = f
             break
     if vocal_file is None and len(output_files) > 0:
-        # Często pierwszy plik to wokal, drugi to instrumental
+
         vocal_file = output_files[0]
 
     if vocal_file and os.path.exists(vocal_file):
@@ -115,10 +99,6 @@ def remove_background(audio_path, model_name="UVR-MDX-NET-Inst_HQ_3.onnx"):
         return audio_path
 
 def preprocess_audio(input_path, remove_bg=True, trim=True):
-    """
-    Główna funkcja przetwarzająca: usuwa tło i/lub ciszę.
-    Zwraca ścieżkę do przetworzonego pliku.
-    """
     if input_path is None:
         return None
 
@@ -133,9 +113,7 @@ def preprocess_audio(input_path, remove_bg=True, trim=True):
 # ========================= CLONING =========================
 def clone_voice(reference_audio, text, language="pl", device=DEVICE,
                 remove_background=True, trim_silence=True, output_path="cloned.wav"):
-    """
-    Klonuje głos z referencyjnego audio – najpierw czyści próbkę, potem generuje mowę.
-    """
+
     if reference_audio is None:
         return None, "❌ Brak pliku referencyjnego."
 
@@ -168,7 +146,7 @@ def clone_voice(reference_audio, text, language="pl", device=DEVICE,
         return None, f"❌ Błąd: {str(e)}"
 
 def extract_audio_from_video(video_path, output_audio="extracted_audio.wav"):
-    """Wyodrębnia audio z pliku wideo za pomocą ffmpeg"""
+    """Extract audio from a video file with FFmpeg."""
     if not video_path:
         return None, "No video provided."
     try:
@@ -190,8 +168,7 @@ css = """
 
 with gr.Blocks(css=css, title="🎤 Voice Cloner Pro") as demo:
     gr.Markdown("""
-    # 🎤 Voice Cloner Pro – z czyszczeniem próbki
-    ### Usuń tło i ciszę, aby uzyskać idealny głos referencyjny dla XTTS
+    # Clean the sample before using it as the XTTS voice reference.
     """)
 
     with gr.Row():

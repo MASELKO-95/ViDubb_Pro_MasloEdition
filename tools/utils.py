@@ -1,10 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-tools/utils.py – Helper functions for ViDubb
-Fixed: DeepFace enforce_detection=False for tolerance
-"""
-
 import os
 import shutil
 import cv2

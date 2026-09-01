@@ -1,10 +1,6 @@
-# -*- coding: utf-8 -*-
-"""
-Blueprint for project database management (DaVinci Resolve style)
-"""
 import os
 from flask import Blueprint, jsonify, request
-from modules.state import state, Project
+from modules.state import state
 from modules.config import PROJECTS_DIR
 
 projects_bp = Blueprint('projects', __name__)
@@ -24,12 +20,12 @@ def create_project():
     data = request.get_json() or {}
     name = data.get("name", "").strip()
     if not name:
-        return jsonify({"error": "Nazwa projektu jest wymagana"}), 400
+        return jsonify({"error": "Project name is required"}), 400
     safe_name = "".join([c for c in name if c.isalpha() or c.isdigit() or c in (' ', '_', '-')]).strip()
     if not safe_name:
-        return jsonify({"error": "Nieprawidłowa nazwa projektu"}), 400
+        return jsonify({"error": "Invalid project name"}), 400
     state.load_project(safe_name)
-    state.add_log(f"📁 Utworzono i wczytano nowy projekt: {safe_name}")
+    state.add_log(f"📁 Created and loaded project: {safe_name}")
     return jsonify({"success": True, "project": state.active_project.to_dict()})
 
 @projects_bp.route("/api/projects/load", methods=["POST"])
@@ -37,21 +33,21 @@ def load_project_api():
     data = request.get_json() or {}
     name = data.get("name", "").strip()
     if not name:
-        return jsonify({"error": "Nazwa projektu jest wymagana"}), 400
+        return jsonify({"error": "Project name is required"}), 400
     filepath = os.path.join(PROJECTS_DIR, f"{name}.json")
     if not os.path.exists(filepath):
-        return jsonify({"error": "Projekt nie istnieje"}), 404
+        return jsonify({"error": "Project does not exist"}), 404
     state.load_project(name)
-    state.add_log(f"📁 Wczytano projekt: {name}")
+    state.add_log(f"📁 Loaded project: {name}")
     return jsonify({"success": True, "project": state.active_project.to_dict()})
 
 @projects_bp.route("/api/projects/save", methods=["POST"])
 def save_project_api():
     if not state.active_project:
-        return jsonify({"error": "Brak aktywnego projektu"}), 400
+        return jsonify({"error": "No active project"}), 400
     data = request.get_json() or {}
     for field in ["video_path", "subtitles_path", "source_lang", "target_lang",
-                  "whisper_model", "hf_token", "ollama_model", "temperature",
+                  "whisper_model", "hf_token", "num_speakers", "ollama_model", "temperature",
                   "prompt", "dub_lang", "output_mode", "tts_engine", "voice",
                   "keep_bg", "hardsub", "validation_model", "output_video_path", "context",
                   "ai_endpoint", "ai_provider", "auto_retry_count", "audio_enhance", "enhance_method"]:
@@ -61,7 +57,7 @@ def save_project_api():
     if "subtitles" in data:
         state.active_project.subtitles = data["subtitles"]
     state.active_project.save()
-    state.add_log(f"💾 Projekt '{state.active_project.name}' został zapisany.")
+    state.add_log(f"💾 Saved project: '{state.active_project.name}'.")
     return jsonify({"success": True})
 
 @projects_bp.route("/api/projects/delete", methods=["POST"])
@@ -69,9 +65,9 @@ def delete_project_api():
     data = request.get_json() or {}
     name = data.get("name", "").strip()
     if not name:
-        return jsonify({"error": "Nazwa projektu jest wymagana"}), 400
+        return jsonify({"error": "Project name is required"}), 400
     success = state.delete_project(name)
     if success:
-        state.add_log(f"🗑️ Usunięto projekt: {name}")
+        state.add_log(f"🗑️ Deleted project: {name}")
         return jsonify({"success": True})
-    return jsonify({"error": "Projekt nie został znaleziony"}), 404
+    return jsonify({"error": "Project not found"}), 404

@@ -120,10 +120,7 @@ def _build_speaker_references(
     timestamps: list,
     speakers: list
 ) -> dict:
-    """
-    Tworzy jeden, zbiorczy plik referencyjny .wav dla KAŻDEGO unikalnego speakera.
-    Łączy WSZYSTKIE fragmenty danego speakera w jeden ciągły plik.
-    """
+
     speaker_refs = {}
     if not speakers or not timestamps:
         return speaker_refs
@@ -138,8 +135,8 @@ def _build_speaker_references(
     state.add_log(f"  👥 Znaleziono {len(unique_speakers)} unikalnych speakerów. Agregacja referencji...")
 
     for speaker in unique_speakers:
+        chunks_list = []
         combined_audio = AudioSegment.empty()
-        chunks_count = 0
 
         for i, spk_label in enumerate(speakers):
             if spk_label == speaker:
@@ -151,24 +148,31 @@ def _build_speaker_references(
                     safe_start = max(0, start_ms - ctx)
                     safe_end = min(len(base_audio), end_ms + ctx)
                     chunk = base_audio[safe_start:safe_end]
+                    chunks_list.append(chunk)
                     combined_audio += chunk
                     combined_audio += AudioSegment.silent(duration=50)
-                    chunks_count += 1
 
-        if len(combined_audio) >= 2500:
+        if len(combined_audio) >= 2000:
             safe_name = _safe_filename(speaker)
-            ref_path = os.path.join(SPEAKERS_DIR, f"{safe_name}.wav")
-            optimized_audio = (
-                combined_audio
-                .set_frame_rate(22050)
-                .set_channels(1)
-                .set_sample_width(2)
-            )
-            optimized_audio.export(ref_path, format="wav")
+            # Update/learn voice in persistent Voice DB
+            from modules.services.voice_db_service import update_or_create_voice_profile
+            resolved_profile_name = update_or_create_voice_profile(safe_name, chunks_list)
+
+            ref_path = os.path.join(SPEAKERS_DIR, f"{_safe_filename(resolved_profile_name)}.wav")
+            if not os.path.exists(ref_path):
+                ref_path = os.path.join(SPEAKERS_DIR, f"{safe_name}.wav")
+                optimized_audio = (
+                    combined_audio
+                    .set_frame_rate(22050)
+                    .set_channels(1)
+                    .set_sample_width(2)
+                )
+                optimized_audio.export(ref_path, format="wav")
+
             speaker_refs[speaker] = ref_path
-            state.add_log(f"    ✅ {speaker}: zbudowano referencję z {chunks_count} fragmentów ({len(optimized_audio)/1000:.1f}s)")
+            state.add_log(f"    ✅ {speaker}: przypisano/zaktualizowano referencję głosową '{resolved_profile_name}' ({len(combined_audio)/1000:.1f}s)")
         else:
-            state.add_log(f"    ⚠️ {speaker}: za mało materiału ({len(combined_audio)/1000:.1f}s z {chunks_count} fragmentów). Pomijam.")
+            state.add_log(f"    ⚠️ {speaker}: za mało materiału ({len(combined_audio)/1000:.1f}s). Pomijam.")
 
     state.add_log(f"  ✅ Gotowe referencje: {len(speaker_refs)}/{len(unique_speakers)} speakerów.")
     return speaker_refs
@@ -306,6 +310,81 @@ def _xtts_generate_chunk(
 # MAIN DUBBING
 # ============================================================
 
+def build_dubbing_timeline(
+    timestamps: list,
+    total: int | None = None,
+    active_lines: list[bool] | None = None,
+) -> str:
+    """Build the dub from prepared chunks using the reviewed timeline."""
+    state.add_log("  🎬 Sklejam zaakceptowane fragmenty audio na osi czasu…")
+    total = len(timestamps) if total is None else min(total, len(timestamps))
+    active_lines = active_lines or [True] * total
+
+    total_dur_ms = max((ts[1] for ts in timestamps), default=57_000) + 3000
+    timeline = AudioSegment.silent(duration=total_dur_ms)
+
+    for i in range(total):
+        if i >= len(active_lines) or not active_lines[i]:
+            continue
+
+        start_ms, end_ms = timestamps[i]
+        chunk_path = os.path.join(CHUNKS_DIR, f"{i}.wav")
+        if not os.path.exists(chunk_path):
+            continue
+
+        try:
+            with open(chunk_path, "rb") as chunk_file:
+                chunk = AudioSegment.from_file(chunk_file)
+            # Respect the reviewed End value. Also protect against an overlap
+            # when the next clip starts earlier than the chosen end.
+            slot_end_ms = max(start_ms + 100, end_ms)
+            if i + 1 < len(timestamps):
+                slot_end_ms = min(slot_end_ms, timestamps[i + 1][0])
+            max_allowed = max(100, slot_end_ms - start_ms)
+
+            if len(chunk) > max_allowed:
+                state.add_log(
+                    f"    ⚠️ Linia {i + 1}: audio {len(chunk)} ms, slot "
+                    f"{max_allowed} ms — końcówka zostanie przycięta."
+                )
+                chunk = chunk[:max_allowed]
+
+            timeline = timeline.overlay(chunk, position=int(start_ms))
+        except Exception as e:
+            state.add_log(f"    ⚠️ Nie mogę wczytać fragmentu {i}: {e}")
+
+    dub_path = os.path.join(AUDIO_DIR, "dub_raw.wav")
+    export_handle = timeline.export(dub_path, format="wav")
+    export_handle.close()
+    state.add_log(
+        f"  ✅ Dubbing sklejony (reviewed timeline) → {dub_path} "
+        f"({len(timeline) / 1000:.1f}s)"
+    )
+    return dub_path
+
+
+def prepared_chunk_metadata(timestamps: list) -> list[dict]:
+    """Return actual TTS durations for the timeline review UI."""
+    result = []
+    for index, (start_ms, end_ms) in enumerate(timestamps):
+        chunk_path = os.path.join(CHUNKS_DIR, f"{index}.wav")
+        actual_ms = 0
+        if os.path.isfile(chunk_path):
+            try:
+                with open(chunk_path, "rb") as chunk_file:
+                    actual_ms = len(AudioSegment.from_file(chunk_file))
+            except Exception:
+                actual_ms = 0
+        slot_ms = max(0, int(end_ms) - int(start_ms))
+        result.append({
+            "index": index,
+            "actual_ms": actual_ms,
+            "slot_ms": slot_ms,
+            "overflow_ms": max(0, actual_ms - slot_ms),
+            "ready": actual_ms > 0,
+        })
+    return result
+
 def generate_dubbed_audio(
     video_path: str,
     translated_texts: list,
@@ -313,6 +392,7 @@ def generate_dubbed_audio(
     speakers: list,
     target_lang_code: str,
     voice_name: str = "Default",
+    dialogue_voices: list | None = None,
     tts_engine: str = "edge",
     validation_model_size: str = "None",
     auto_retry_count: int = 10
@@ -327,6 +407,7 @@ def generate_dubbed_audio(
     os.makedirs(AUDIO_DIR, exist_ok=True)
 
     total = len(translated_texts)
+    dialogue_voices = dialogue_voices or []
     max_retries = max(1, min(10, int(auto_retry_count or 10)))
 
     # ========================================================
@@ -473,8 +554,6 @@ def generate_dubbed_audio(
         if xtts_lang != target_lang_code:
             state.add_log(f"  ⚠️ XTTS nie obsługuje '{target_lang_code}' — używam '{xtts_lang}'.")
 
-        fatal_xtts_error = False
-
         for i, text in enumerate(translated_texts):
             if state.cancel_flags["dubbing"]:
                 break
@@ -488,7 +567,17 @@ def generate_dubbed_audio(
 
             speaker = speakers[i] if i < len(speakers) else "Unknown"
 
-            if global_ref:
+            selected_voice = str(
+                dialogue_voices[i] if i < len(dialogue_voices) else ""
+            ).strip()
+            selected_ref = (
+                os.path.join(SPEAKERS_DIR, f"{selected_voice}.wav")
+                if selected_voice else ""
+            )
+
+            if selected_ref and os.path.isfile(selected_ref):
+                ref_path = selected_ref
+            elif global_ref:
                 ref_path = global_ref
             else:
                 ref_path = speaker_refs.get(speaker) if speaker_refs else None
@@ -512,7 +601,6 @@ def generate_dubbed_audio(
 
                 if fatal_error:
                     state.add_log(f"    ❌ XTTS konfiguracja: {error_text[:220]}")
-                    fatal_xtts_error = True
                     break
 
                 if gen_ok:
@@ -559,47 +647,4 @@ def generate_dubbed_audio(
     if state.cancel_flags["dubbing"]:
         return ""
 
-    # ========================================================
-    # BUILD TIMELINE
-    # ========================================================
-
-    state.add_log("  🎬 Sklejam fragmenty audio na osi czasu…")
-
-    if timestamps:
-        total_dur_ms = max(ts[1] for ts in timestamps) + 3000
-    else:
-        total_dur_ms = 60000
-
-    timeline = AudioSegment.silent(duration=total_dur_ms)
-
-    for i in range(total):
-        if i >= len(timestamps):
-            break
-
-        start_ms, end_ms = timestamps[i]
-        chunk_path = os.path.join(CHUNKS_DIR, f"{i}.wav")
-
-        if not os.path.exists(chunk_path):
-            continue
-
-        try:
-            chunk = AudioSegment.from_file(chunk_path)
-
-            if i + 1 < len(timestamps):
-                next_start_ms = timestamps[i + 1][0]
-                max_allowed = max(100, next_start_ms - start_ms)
-            else:
-                max_allowed = len(chunk)
-
-            if len(chunk) > max_allowed:
-                chunk = chunk[:max_allowed]
-
-            timeline = timeline.overlay(chunk, position=int(start_ms))
-        except Exception as e:
-            state.add_log(f"    ⚠️ Nie mogę wczytać fragmentu {i}: {e}")
-
-    dub_path = os.path.join(AUDIO_DIR, "dub_raw.wav")
-    timeline.export(dub_path, format="wav")
-    state.add_log(f"  ✅ Dubbing sklejony (timeline) → {dub_path} ({len(timeline) / 1000:.1f}s)")
-
-    return dub_path
+    return build_dubbing_timeline(timestamps, total=total)

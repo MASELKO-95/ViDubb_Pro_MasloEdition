@@ -1,9 +1,9 @@
-<!DOCTYPE html>
-<html lang="pl">
+<!-- <!DOCTYPE html> -->
+<html lang="en">
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>🎬 ViDubb Pro MasloEdition</title>
+  <title>🎬 viDubb Pro — Maslo95 Edition</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
   <style>
@@ -35,10 +35,28 @@
       border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;
       backdrop-filter: blur(10px);
     }
-    .topbar .logo{font-size:1.3rem;font-weight:700;letter-spacing:.5px;
+    .topbar .logo{font-size:1.15rem;font-weight:700;letter-spacing:.5px;white-space:nowrap;flex-shrink:0;
       background: var(--accent-gradient);
       -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
     .topbar .actions{display:flex;gap:10px;align-items:center;}
+    .support-bar{
+      display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;
+      padding:9px 20px;background:#007f49;border-bottom:1px solid rgba(255,255,255,.15);
+      color:#fff;font-size:.86rem;font-weight:600;transition:var(--transition);
+    }
+    .support-bar.is-hidden{display:none;}
+    .support-options{display:flex;gap:7px;}
+    .support-option{
+      display:inline-flex;align-items:center;justify-content:center;min-width:62px;padding:6px 11px;
+      border-radius:9px;background:#fff;color:#007f49;text-decoration:none;font-weight:700;
+      transition:var(--transition);
+    }
+    .support-option:hover{transform:translateY(-1px);box-shadow:0 5px 14px rgba(0,0,0,.22);}
+    .support-close{
+      border:0;background:transparent;color:rgba(255,255,255,.8);cursor:pointer;
+      padding:4px 7px;border-radius:7px;font-size:1rem;line-height:1;
+    }
+    .support-close:hover{background:rgba(255,255,255,.14);color:#fff;}
 
     /* ─── OLLAMA STATUS ─── */
     .ollama-badge{
@@ -247,18 +265,98 @@
     .project-actions{
       display: flex; gap: 6px;
     }
+    .timeline-review-modal{width:96vw;max-width:1500px;height:90vh;padding:0;overflow:hidden;display:flex;flex-direction:column;}
+    .timeline-review-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);}
+    .timeline-review-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+    .timeline-review-scroll{flex:1;overflow:auto;padding:0 18px 18px;}
+    .timeline-review-table{min-width:1220px;}
+    .timeline-review-table input,.timeline-review-table select{padding:6px 7px;font-size:.74rem;min-width:105px;}
+    .timeline-review-table textarea{padding:6px 7px;font-size:.76rem;min-width:260px;resize:vertical;}
+    .timeline-fit{height:8px;min-width:120px;border-radius:6px;background:rgba(255,255,255,.09);overflow:hidden;margin-top:5px;}
+    .timeline-fit > span{display:block;height:100%;background:var(--green);border-radius:6px;}
+    .timeline-fit > span.overflow{background:var(--red);}
+    .timeline-review-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 20px;border-top:1px solid var(--border);background:var(--bg2);}
   </style>
 </head>
 <body>
 
+<aside class="support-bar" id="support-bar" aria-label="Support Project">
+  <span>☕ <span data-i18n="supportProject">Support Project</span></span>
+  <div class="support-options">
+    <a class="support-option" href="https://buycoffee.to/maslo_github?coffeeSize=small" target="_blank" rel="noopener noreferrer" title="Buy coffee for 5 zł">5 zł</a>
+    <a class="support-option" href="https://buycoffee.to/maslo_github?coffeeSize=medium" target="_blank" rel="noopener noreferrer" title="Buy coffee for 10 zł">10 zł</a>
+    <a class="support-option" href="https://buycoffee.to/maslo_github?coffeeSize=large" target="_blank" rel="noopener noreferrer" title="Buy coffee for 50 zł">50 zł</a>
+  </div>
+  <button class="support-close" type="button" onclick="hideSupportBar()" aria-label="Close support banner" title="Close">&times;</button>
+</aside>
+
+<!-- DUBBING TIMELINE REVIEW -->
+<div class="modal-bg" id="timeline-review-modal" style="display:none;z-index:1200;">
+  <div class="modal timeline-review-modal">
+    <div class="timeline-review-head">
+      <div>
+        <h3 style="margin:0;border:0;padding:0;">🎬 Timeline Review</h3>
+        <p style="font-size:.76rem;color:var(--muted);margin-top:4px;">Sprawdź długość, rozmówcę i głos każdej wygenerowanej kwestii przed renderem.</p>
+      </div>
+      <div class="timeline-review-tools">
+        <button class="btn btn-ghost btn-sm" onclick="autoRippleTimeline()">↪ Dopasuj i przesuń kolejne</button>
+        <button class="btn btn-ghost btn-sm" onclick="regenerateTimelineAudio()">🎙 Regeneruj po zmianie tekstu/głosu</button>
+        <button class="btn btn-ghost btn-sm" onclick="approveAllReviewLines()">✅ Zatwierdź wszystkie mieszczące się</button>
+        <button class="btn btn-ghost btn-sm" onclick="closeTimelineReview()">✕</button>
+      </div>
+    </div>
+    <div class="timeline-review-scroll">
+      <table class="timeline-review-table">
+        <thead><tr><th>#</th><th>Start / End</th><th>Slot / audio</th><th>Tekst</th><th>Rozmówca</th><th>Głos</th><th>Podgląd</th><th>Status</th></tr></thead>
+        <tbody id="timeline-review-body"></tbody>
+      </table>
+    </div>
+    <div class="timeline-review-foot">
+      <span id="timeline-review-summary" style="font-size:.8rem;color:var(--muted);"></span>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost" onclick="closeTimelineReview()">Wróć do edycji</button>
+        <button class="btn btn-primary" onclick="renderReviewedDubbing()">🎬 Renderuj zatwierdzone dialogi</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TEST VERSION NOTICE -->
+<div class="modal-bg" id="test-version-modal" style="display:none;z-index:1150;">
+  <div class="modal" style="max-width:620px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;">
+      <h3 style="margin:0;">🧪 viDubb Pro — wersja testowa</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeTestVersionNotice()">✕</button>
+    </div>
+    <p style="margin-top:16px;color:var(--text);line-height:1.55;">
+      Ta wersja jest aktywnie rozwijana. Rozpoznawanie głosów, Timeline Review,
+      klonowanie głosu i Wav2Lip mogą jeszcze wymagać poprawek.
+    </p>
+    <p style="margin-top:10px;color:var(--muted);line-height:1.5;">
+      Jeśli znajdziesz błąd, pobierz raport diagnostyczny i dołącz go do zgłoszenia.
+      Raport maskuje tokeny oraz ścieżkę katalogu domowego.
+    </p>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;">
+      <a class="btn btn-primary" href="https://github.com/MASELKO-95/ViDubb_Pro_MasloEdition/issues/new" target="_blank" rel="noopener noreferrer">🐛 Zgłoś błąd</a>
+      <a class="btn btn-ghost" href="https://github.com/MASELKO-95/ViDubb_Pro_MasloEdition/discussions" target="_blank" rel="noopener noreferrer">💬 Dyskusje projektu</a>
+      <a class="btn btn-ghost" href="/api/diagnostics/report" download>📄 Pobierz logi błędu</a>
+    </div>
+    <div style="margin-top:18px;padding:12px;border-radius:9px;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.22);">
+      <strong>Discord:</strong> Lone wolf® (dawniej MASELKO-95®)<br/>
+      <code id="discord-contact">maselko95</code>
+      <button class="btn btn-ghost btn-sm" onclick="copyDiscordContact()" style="margin-left:8px;">Kopiuj nazwę</button>
+    </div>
+  </div>
+</div>
+
 <!-- LANGUAGE SELECT DIALOG -->
 <div class="modal-bg show" id="lang-modal" style="display:none; z-index: 1000;">
   <div class="modal" style="text-align: center; max-width: 420px; border-color: var(--accent);">
-    <h3 style="margin-bottom: 20px; font-size: 1.4rem; background: var(--accent-gradient); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;" class="logo">🎬 ViDubb Pro</h3>
-    <p style="margin-bottom: 24px; color: var(--text); font-size: 0.95rem; font-weight: 500;">Wybierz język interfejsu / Select Interface Language</p>
+    <h3 style="margin-bottom: 20px; font-size: 1.4rem; background: var(--accent-gradient); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;" class="logo">🎬 viDubb Pro — Maslo95 Edition</h3>
+    <p style="margin-bottom: 24px; color: var(--text); font-size: 0.95rem; font-weight: 500;">Select Interface Language / Wybierz język interfejsu</p>
     <div style="display: flex; flex-direction: column; gap: 10px;">
-      <button class="btn btn-primary" onclick="chooseLanguage('pl')">Polski (Domyślny)</button>
-      <button class="btn btn-ghost" onclick="chooseLanguage('en')">English</button>
+      <button class="btn btn-primary" onclick="chooseLanguage('en')">🇬🇧 English (Default)</button>
+      <button class="btn btn-ghost" onclick="chooseLanguage('pl')">🇵🇱 Polski</button>
     </div>
   </div>
 </div>
@@ -266,7 +364,10 @@
 <!-- PROJECT MANAGER DIALOG -->
 <div class="modal-bg" id="project-modal" style="display:none; z-index: 900;">
   <div class="modal" style="max-width: 600px; width: 90%;">
-    <h3 data-i18n="pmTitle">Katalog Projektów</h3>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <h3 data-i18n="pmTitle" style="margin:0;">Katalog Projektów</h3>
+      <button class="btn btn-ghost btn-sm" onclick="hideProjectManager()" data-i18n="closeBtn">✕ Close</button>
+    </div>
     <div style="display: flex; gap: 8px; margin-bottom: 20px;">
       <input type="text" id="new-project-name" data-i18n-placeholder="pmNamePlaceholder" placeholder="Nazwa nowego projektu..." style="flex: 1;"/>
       <button class="btn btn-primary" onclick="createNewProject()" data-i18n="pmCreateBtn">Utwórz projekt</button>
@@ -280,10 +381,40 @@
   </div>
 </div>
 
+<!-- VOICE DB MODAL -->
+<div class="modal-bg" id="voice-db-modal" style="display:none; z-index:1100;">
+  <div class="modal" style="max-width: 600px; width: 90%;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <h3 style="margin:0; font-size:1.2rem;" data-i18n="voiceDbTitle">🎙️ Saved Voice Database (Voice DB)</h3>
+      <button class="btn btn-ghost btn-sm" onclick="closeVoiceDBModal()" data-i18n="closeBtn">✕ Close</button>
+    </div>
+    <p style="font-size:0.83rem; color:var(--muted); margin-bottom:14px;" data-i18n="voiceDbDescription">
+      The system automatically recognizes and learns voices from the video track. Here you can review and delete learned voice profiles.
+    </p>
+    <div id="voice-db-list" style="max-height: 350px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px;">
+      <div style="text-align:center; padding:20px; color:var(--muted);" data-i18n="voiceDbLoading">Loading voice database…</div>
+    </div>
+    <div style="padding:12px;border:1px solid var(--border);border-radius:8px;margin-bottom:12px;">
+      <strong style="font-size:.85rem;">Import one person from ZIP</strong>
+      <p style="font-size:.75rem;color:var(--muted);margin:5px 0 8px;">Put all recordings of the same person in folders inside one ZIP. They will become one voice profile.</p>
+      <input id="voice-zip-name" placeholder="Person / actor name" style="margin-bottom:6px;"/>
+      <input id="voice-zip-source" placeholder="Source movie (optional)" style="margin-bottom:6px;"/>
+      <input id="voice-zip-file" type="file" accept=".zip"/>
+      <button class="btn btn-primary btn-sm" style="margin-top:8px;" onclick="importVoiceZip()">📦 Import ZIP as one voice</button>
+    </div>
+    <div style="text-align:right;">
+      <button class="btn btn-primary btn-sm" onclick="closeVoiceDBModal()" data-i18n="voiceDbDone">Done</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOP BAR -->
 <header class="topbar" id="topbar">
-  <span class="logo">🎬 ViDubb Pro</span>
+  <span class="logo">🎬 viDubb Pro — Maslo95 Edition</span>
   <div class="actions">
+    <button class="btn btn-ghost btn-sm" onclick="openTestVersionNotice()" title="Test version / bug reports" style="color:var(--yellow);border-color:rgba(251,191,36,.35);">🧪 TEST</button>
+    <button class="btn btn-ghost btn-sm" id="interface-lang-btn" onclick="toggleInterfaceLanguage()">🇵🇱 PL</button>
+    <button class="btn btn-ghost btn-sm" onclick="openVoiceDBModal()" data-i18n="voiceDbButton">🎙️ Voice Database</button>
     <button class="btn btn-ghost btn-sm" onclick="showProjectManager()" data-i18n="projectManager">📁 Projekty</button>
     <button class="btn btn-danger btn-sm" onclick="resetApp()" data-i18n="resetBtn">🔄 Reset</button>
     <button class="btn btn-ghost btn-sm" onclick="exportSRT()" data-i18n="exportSrt">💾 Export SRT</button>
@@ -324,10 +455,12 @@
         <span id="sub-count" style="color:var(--muted);font-weight:400; font-size: 0.85rem;"></span>
       </h3>
       <div class="sub-toolbar">
+        <button class="btn btn-ghost btn-sm" id="btn-undo" onclick="undoSubtitleChange()" title="Undo subtitle change (Ctrl+Z)" disabled>↩ Undo</button>
         <button class="btn btn-ghost btn-sm" onclick="addSubtitle()" title="Add Subtitle">➕</button>
         <button class="btn btn-ghost btn-sm" onclick="splitSubtitle()" title="Split Subtitle">✂️</button>
         <button class="btn btn-ghost btn-sm" onclick="mergeSubtitle()" title="Merge Subtitles">🔗</button>
         <button class="btn btn-ghost btn-sm" onclick="deleteSubtitle()" title="Delete Subtitle">🗑️</button>
+        <button class="btn btn-ghost btn-sm" onclick="alignReplacementSubtitles()" title="Fit uploaded subtitle text to the current Whisper timeline">🧩 Align text</button>
         <div style="width:1px;background:var(--border);margin:0 4px;"></div>
         <button class="btn btn-ghost btn-sm" onclick="approveAll()" title="Approve All" style="color:var(--green)">✅ All</button>
         <button class="btn btn-ghost btn-sm" onclick="rejectAll()" title="Reject All" style="color:var(--red)">❌ All</button>
@@ -345,6 +478,7 @@
             <th>Original</th>
             <th>Translation</th>
             <th style="width:80px">Speaker</th>
+            <th style="width:100px">Voice</th>
             <th style="width:58px">Conf</th>
             <th style="width:72px" title="Approval status — click badge to toggle">✅ OK</th>
             <th style="width:56px" title="Ignore — pomija tłumaczenie i dubbing (np. muzyka intro)">🔇</th>
@@ -425,6 +559,14 @@
           <option>tiny</option><option>base</option><option>small</option>
           <option>medium</option><option>large</option><option selected>turbo</option>
         </select>
+        <label data-i18n="speakerCountLabel">Liczba rozmówców</label>
+        <select id="num-speakers">
+          <option value="0" selected data-i18n="speakerCountAuto">🔍 Auto (wykryj automatycznie)</option>
+          {% for count in range(1, 11) %}<option value="{{count}}">{{count}}</option>{% endfor %}
+        </select>
+        <div data-i18n="speakerCountHint" style="font-size:.7rem;color:var(--muted);margin-top:4px;">
+          Jeśli Auto miesza głosy, ustaw znaną liczbę osób w nagraniu.
+        </div>
         <label data-i18n="hfLabel">Token HuggingFace (opcjonalnie)</label>
         <input id="hf-token" type="password" placeholder="hf_..."/>
         <br/>
@@ -444,6 +586,16 @@
         <div class="row">
           <div style="flex:1"><label data-i18n="editStartLabel">Start</label><input id="edit-start" placeholder="00:00:00,000"/></div>
           <div style="flex:1"><label data-i18n="editEndLabel">End</label><input id="edit-end" placeholder="00:00:05,000"/></div>
+        </div>
+        <div class="row" style="margin-top:6px">
+          <div style="flex:1"><label>Duration</label><input id="edit-duration" readonly value="0.000 s"/></div>
+          <div style="flex:1"><label>Speaker</label><input id="edit-speaker" placeholder="SPEAKER_00"/></div>
+        </div>
+        <label>Voice used for this dialogue</label>
+        <select id="edit-voice"><option value="">Project default / detected voice</option></select>
+        <div class="row" style="margin-top:7px">
+          <button class="btn btn-ghost btn-sm" onclick="previewSelectedSegment()">▶ Preview video segment</button>
+          <button class="btn btn-ghost btn-sm" onclick="previewSelectedVoice()">🎧 Preview voice</button>
         </div>
         <label data-i18n="editTranslationLabel">Translation</label>
         <textarea id="edit-text" rows="3"></textarea>
@@ -539,6 +691,7 @@
 
         <label><input type="checkbox" id="keep-bg" checked/> <span data-i18n="keepBgLabel">Zachowaj oryginalne tło audio</span></label>
         <label><input type="checkbox" id="hardsub"/> <span data-i18n="hardsubLabel">🔥 Wypal napisy na wideo (Hardsub)</span></label>
+        <label><input type="checkbox" id="lipsync"/> <span>💋 Synchronizacja ust (Wav2Lip Lip-Sync)</span></label>
         
         <div class="row" style="margin-top:6px; display:flex; gap:10px;">
           <div style="flex:2">
@@ -563,9 +716,9 @@
           <label style="margin:0;"><input type="checkbox" id="audio-enhance"/> <span style="font-size:0.82rem; font-weight:600; color:#a5b4fc;">✨ Ulepsz jakość audio AI (Denoise &amp; Clarity)</span></label>
           <div id="enhance-options" style="margin-top:6px; display:flex; gap:6px;">
             <select id="enhance-method" style="font-size:0.75rem; padding:6px 8px;">
-              <option value="dsp_denoise" selected>Standardowy Denoise &amp; De-rumble (DSP)</option>
-              <option value="broadcast_voice">Emisyjny Lektor / Podcast (Warmth &amp; DynNorm)</option>
-              <option value="neural_enhance">Neuronowe DeepFilterNet (AI Suppression)</option>
+              <option value="dsp_denoise" selected>Standard Denoise &amp; De-rumble (DSP)</option>
+              <option value="broadcast_voice">Broadcast Voice / Podcast (Warmth &amp; DynNorm)</option>
+              <option value="neural_enhance">Neural DeepFilterNet (AI Suppression)</option>
             </select>
           </div>
         </div>
@@ -576,11 +729,11 @@
         <!-- Approval / Auto-Accept -->
         <div style="margin-top:10px; padding:10px 12px; border-radius:8px; background:rgba(16,185,129,0.06); border:1px solid rgba(16,185,129,0.2);">
           <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-            <span style="font-size:0.82rem; font-weight:600; color:var(--green);">✅ System zatwierdzania</span>
+            <span style="font-size:0.82rem; font-weight:600; color:var(--green);" data-i18n="approvalSystem">✅ Approval system</span>
             <span id="approval-stats" style="font-size:0.75rem; color:var(--muted);">—</span>
           </div>
-          <label style="margin:0;"><input type="checkbox" id="auto-accept" checked/> <span style="font-size:0.82rem;">Auto-akceptuj wszystkie linie</span></label>
-          <div style="font-size:0.73rem; color:var(--muted); margin-top:4px;" id="approval-hint">Auto-akceptacja włączona — wszystkie linie zostaną przetworzone.</div>
+          <label style="margin:0;"><input type="checkbox" id="auto-accept" disabled/> <span style="font-size:0.82rem;">Timeline Review wymagany przed renderem</span></label>
+          <div style="font-size:0.73rem; color:var(--muted); margin-top:4px;" id="approval-hint">Po wygenerowaniu audio sprawdź czas, rozmówcę i głos każdej kwestii.</div>
         </div>
 
         <div class="row" style="margin-top:12px">
@@ -633,7 +786,8 @@
 /* ═══════════════════════ TRANSLATION I18N ═══════════════════════ */
 const i18n = {
   pl: {
-    title: "🎬 ViDubb Pro",
+    title: "🎬 viDubb Pro — Maslo95 Edition v1.0.0",
+    supportProject: "Wesprzyj viDubb Pro:",
     resetBtn: "🔄 Reset",
     exportSrt: "💾 Eksportuj SRT",
     downloadVideo: "📥 Pobierz Wideo",
@@ -654,6 +808,9 @@ const i18n = {
     srcLangLabel: "Język źródłowy",
     tgtLangLabel: "Język docelowy",
     whisperLabel: "Model Whisper (jeśli brak napisów)",
+    speakerCountLabel: "Liczba rozmówców",
+    speakerCountAuto: "🔍 Auto (wykryj automatycznie)",
+    speakerCountHint: "Jeśli Auto miesza głosy, ustaw znaną liczbę osób w nagraniu.",
     hfLabel: "Token HuggingFace (opcjonalnie)",
     btnLoadVideo: "🚀 Wczytaj i Transkrybuj",
     btnCancelLoad: "🛑 Zatrzymaj",
@@ -692,6 +849,21 @@ const i18n = {
     pmDeleteBtn: "Usuń",
     pmNoProjects: "Brak projektów. Utwórz nowy powyżej.",
     langSelectTitle: "Wybierz język interfejsu / Select Language",
+    voiceDbButton: "🎙️ Baza Głosów",
+    voiceDbTitle: "🎙️ Baza Zapamiętanych Głosów (Voice DB)",
+    voiceDbDescription: "System automatycznie rozpoznaje i uczy się głosów ze ścieżki wideo. Tutaj możesz przejrzeć i usunąć wyuczone profile głosowe.",
+    voiceDbLoading: "Ładowanie bazy głosów…",
+    voiceDbDone: "Gotowe",
+    closeBtn: "✕ Zamknij",
+    voiceSamples: "Próbki",
+    voiceFragments: "fragmentów",
+    voiceDelete: "🗑️ Usuń",
+    voiceLoadError: "Błąd ładowania bazy głosów",
+    voiceDeleteConfirm: "Czy na pewno chcesz usunąć profil głosu",
+    voiceDeleteError: "Błąd podczas usuwania",
+    approvalSystem: "✅ System zatwierdzania",
+    autoAcceptAll: "Auto-akceptuj wszystkie linie",
+    autoAcceptHint: "Auto-akceptacja włączona — wszystkie linie zostaną przetworzone.",
     statusReady: "Gotowy.",
     statusLoading: "Wczytywanie i transkrypcja...",
     statusProcessing: "Generowanie dubbingu...",
@@ -699,7 +871,8 @@ const i18n = {
     statusError: "Błąd."
   },
   en: {
-    title: "🎬 ViDubb Pro",
+    title: "🎬 viDubb Pro — Maslo95 Edition v1.0.0",
+    supportProject: "Support viDubb Pro:",
     resetBtn: "🔄 Reset",
     exportSrt: "💾 Export SRT",
     downloadVideo: "📥 Download Video",
@@ -720,6 +893,9 @@ const i18n = {
     srcLangLabel: "Source Language",
     tgtLangLabel: "Target Language",
     whisperLabel: "Whisper Model (if no subtitles)",
+    speakerCountLabel: "Number of speakers",
+    speakerCountAuto: "🔍 Auto (detect automatically)",
+    speakerCountHint: "If Auto mixes voices, set the known number of people in the recording.",
     hfLabel: "HuggingFace Token (optional)",
     btnLoadVideo: "🚀 Load & Transcribe",
     btnCancelLoad: "🛑 Cancel",
@@ -758,6 +934,21 @@ const i18n = {
     pmDeleteBtn: "Delete",
     pmNoProjects: "No projects found. Create a new one above.",
     langSelectTitle: "Select Interface Language",
+    voiceDbButton: "🎙️ Voice Database",
+    voiceDbTitle: "🎙️ Saved Voice Database (Voice DB)",
+    voiceDbDescription: "The system automatically recognizes and learns voices from the video track. Here you can review and delete learned voice profiles.",
+    voiceDbLoading: "Loading voice database…",
+    voiceDbDone: "Done",
+    closeBtn: "✕ Close",
+    voiceSamples: "Samples",
+    voiceFragments: "fragments",
+    voiceDelete: "🗑️ Delete",
+    voiceLoadError: "Failed to load voice database",
+    voiceDeleteConfirm: "Are you sure you want to delete voice profile",
+    voiceDeleteError: "Delete failed",
+    approvalSystem: "✅ Approval system",
+    autoAcceptAll: "Auto-accept all lines",
+    autoAcceptHint: "Auto-accept is enabled — all lines will be processed.",
     statusReady: "Ready.",
     statusLoading: "Loading and transcribing...",
     statusProcessing: "Generating dubbing...",
@@ -769,6 +960,35 @@ const i18n = {
 let currentLang = localStorage.getItem('vidubb_lang') || '';
 let activeProject = null;
 let rows = [];          // subtitle rows
+const subtitleUndoStack = [];
+const SUBTITLE_UNDO_LIMIT = 50;
+
+function rememberSubtitleState() {
+  subtitleUndoStack.push(JSON.stringify(rows));
+  if (subtitleUndoStack.length > SUBTITLE_UNDO_LIMIT) subtitleUndoStack.shift();
+  updateUndoButton();
+}
+
+function updateUndoButton() {
+  const button = document.getElementById('btn-undo');
+  if (button) button.disabled = subtitleUndoStack.length === 0;
+}
+
+function clearSubtitleUndoHistory() {
+  subtitleUndoStack.length = 0;
+  updateUndoButton();
+}
+
+function undoSubtitleChange() {
+  if (!subtitleUndoStack.length) return;
+  rows = JSON.parse(subtitleUndoStack.pop());
+  selIdx = -1;
+  clearEdit();
+  renderTable();
+  syncToServer();
+  updateUndoButton();
+  setStatus('↩ Undid the last subtitle change.', 'ok');
+}
 let selIdx = -1;        // selected row index
 let logOpen = false;
 let logCount = 0;       // how many lines already fetched
@@ -805,18 +1025,88 @@ function applyLanguage(lang) {
       el.placeholder = translations[key];
     }
   });
+
+  updateInterfaceLanguageButton();
+}
+
+function updateInterfaceLanguageButton() {
+  const btn = document.getElementById('interface-lang-btn');
+  if (!btn) return;
+  btn.textContent = currentLang === 'pl' ? '🇬🇧 EN' : '🇵🇱 PL';
+  btn.title = currentLang === 'pl'
+    ? 'Switch interface to English'
+    : 'Zmień interfejs na polski';
+}
+
+function toggleInterfaceLanguage() {
+  applyLanguage(currentLang === 'pl' ? 'en' : 'pl');
+
+  if (typeof renderTable === 'function') renderTable();
+  if (typeof updateApprovalStats === 'function') updateApprovalStats();
+
+  const voiceModal = document.getElementById('voice-db-modal');
+  if (
+    voiceModal &&
+    voiceModal.style.display === 'flex' &&
+    typeof refreshVoiceDBList === 'function'
+  ) {
+    refreshVoiceDBList();
+  }
 }
 
 function chooseLanguage(lang) {
   applyLanguage(lang);
   document.getElementById('lang-modal').style.display = 'none';
   showProjectManager();
+  setTimeout(showTestVersionNoticeOnce, 500);
+}
+
+function openTestVersionNotice() {
+  document.getElementById('test-version-modal').style.display = 'flex';
+}
+
+function closeTestVersionNotice() {
+  document.getElementById('test-version-modal').style.display = 'none';
+  sessionStorage.setItem('vidubb_test_notice_seen', '1');
+}
+
+function showTestVersionNoticeOnce() {
+  if (!sessionStorage.getItem('vidubb_test_notice_seen')) openTestVersionNotice();
+}
+
+async function copyDiscordContact() {
+  try {
+    await navigator.clipboard.writeText('maselko95');
+    setStatus('✅ Skopiowano nazwę Discord: maselko95', 'ok');
+  } catch (_) {
+    prompt('Discord:', 'maselko95');
+  }
 }
 
 /* ═══════════════════════ PROJECT MANAGER ═══════════════════════ */
 function showProjectManager() {
   document.getElementById('project-modal').style.display = 'flex';
   refreshProjectsList();
+}
+
+function hideProjectManager() {
+  document.getElementById('project-modal').style.display = 'none';
+}
+
+function hideSupportBar() {
+  document.getElementById('support-bar')?.classList.add('is-hidden');
+}
+
+function showSupportBar() {
+  document.getElementById('support-bar')?.classList.remove('is-hidden');
+}
+
+function showCurrentProjectVideo() {
+  const vp = document.getElementById('video-player');
+  vp.src = '/api/video/current?t=' + Date.now();
+  vp.style.display = 'block';
+  document.getElementById('video-placeholder').style.display = 'none';
+  vp.load();
 }
 
 async function refreshProjectsList() {
@@ -907,6 +1197,7 @@ async function deleteProject(name) {
 }
 
 async function loadProjectState(proj) {
+  showSupportBar();
   document.getElementById('active-proj-badge').textContent = proj.name;
   document.getElementById('video-path').value = proj.video_path || '';
   document.getElementById('sub-path').value = proj.subtitles_path || '';
@@ -914,6 +1205,7 @@ async function loadProjectState(proj) {
   document.getElementById('target-lang').value = proj.target_lang || 'Polish';
   document.getElementById('whisper-model').value = proj.whisper_model || 'turbo';
   document.getElementById('hf-token').value = proj.hf_token || '';
+  document.getElementById('num-speakers').value = String(proj.num_speakers || 0);
   document.getElementById('ollama-model').value = proj.ollama_model || '';
   document.getElementById('temperature').value = proj.temperature || 0.1;
   document.getElementById('temp-val').textContent = proj.temperature || 0.1;
@@ -945,16 +1237,14 @@ async function loadProjectState(proj) {
   }
 
   if (proj.video_path) {
-    const vp = document.getElementById('video-player');
-    vp.src = 'file://' + proj.video_path;
-    vp.style.display = 'block';
-    document.getElementById('video-placeholder').style.display = 'none';
+    showCurrentProjectVideo();
   } else {
     document.getElementById('video-player').style.display = 'none';
     document.getElementById('video-placeholder').style.display = 'flex';
   }
 
   rows = proj.subtitles || [];
+  clearSubtitleUndoHistory();
   renderTable();
   toggleVoiceOptions();
 
@@ -984,6 +1274,7 @@ async function syncToServer() {
     target_lang: document.getElementById('target-lang').value,
     whisper_model: document.getElementById('whisper-model').value,
     hf_token: document.getElementById('hf-token').value,
+    num_speakers: parseInt(document.getElementById('num-speakers').value || '0', 10),
     ollama_model: document.getElementById('ollama-model').value,
     temperature: parseFloat(document.getElementById('temperature').value),
     prompt: document.getElementById('prompt-textarea').value,
@@ -1167,12 +1458,13 @@ function renderTable() {
       <td>${esc(row.Original ?? '')}</td>
       <td>${esc(row.Translation ?? '')}${row.Edited ? ' <span class="badge-edited">✓</span>' : ''}</td>
       <td style="color:var(--muted)">${row.Speaker ?? ''}</td>
+      <td style="color:var(--accent);font-size:.75rem">${esc(row.Voice || 'Default')}</td>
       <td>
         <span>${conf}</span>
         <div class="conf-bar"><div class="conf-fill" style="width:${conf}%"></div></div>
       </td>
       <td><span class="${ab.cls}" onclick="event.stopPropagation(); toggleApproval(${i})" title="Click to cycle: pending→approved→rejected">${ab.label}</span></td>
-      <td><input type="checkbox" ${ignChecked} title="Ignoruj — pomija tłumaczenie i dubbing" onclick="event.stopPropagation(); toggleIgnore(${i})" style="cursor:pointer;width:16px;height:16px;accent-color:var(--yellow)"></td>`;
+      <td><input type="checkbox" ${ignChecked} title="${currentLang === 'pl' ? 'Ignoruj — pomija tłumaczenie i dubbing' : 'Ignore — skip translation and dubbing'}" onclick="event.stopPropagation(); toggleIgnore(${i})" style="cursor:pointer;width:16px;height:16px;accent-color:var(--yellow)"></td>`;
     tr.onclick = () => selectRow(i);
     tbody.appendChild(tr);
   });
@@ -1191,11 +1483,49 @@ function selectRow(i) {
   document.getElementById('edit-start').value = row.Start ?? '';
   document.getElementById('edit-end').value   = row.End ?? '';
   document.getElementById('edit-text').value  = row.Translation || row.Original || '';
+  document.getElementById('edit-speaker').value = row.Speaker || 'Unknown';
+  updateEditDuration();
+  loadEditVoiceOptions(row.Voice || '');
 
   const apvRow = document.getElementById('approval-row');
   apvRow.style.display = 'flex';
   updateApprovalBadgeEdit(row.Approved || 'pending');
   renderTable();
+}
+
+function updateEditDuration() {
+  const duration = Math.max(0, parseTime(document.getElementById('edit-end').value) - parseTime(document.getElementById('edit-start').value));
+  document.getElementById('edit-duration').value = (duration / 1000).toFixed(3) + ' s';
+}
+
+async function loadEditVoiceOptions(selectedVoice = '') {
+  const select = document.getElementById('edit-voice');
+  try {
+    const response = await fetch('/api/voices');
+    const data = await response.json();
+    select.innerHTML = '<option value="">Project default / detected voice</option>' +
+      (data.voices || []).filter(v => v !== 'Default').map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
+    select.value = selectedVoice;
+  } catch (_) {}
+}
+
+function previewSelectedSegment() {
+  if (selIdx < 0) return;
+  const player = document.getElementById('video-player');
+  const start = parseTime(rows[selIdx].Start) / 1000;
+  const end = parseTime(rows[selIdx].End) / 1000;
+  player.currentTime = start;
+  player.play();
+  const stop = () => { if (player.currentTime >= end) { player.pause(); player.removeEventListener('timeupdate', stop); } };
+  player.addEventListener('timeupdate', stop);
+}
+
+function previewSelectedVoice() {
+  const voice = document.getElementById('edit-voice').value;
+  if (!voice) return setStatus('Select a saved voice first.', 'warn');
+  const audio = document.getElementById('voice-preview-audio');
+  audio.src = '/api/voices/' + encodeURIComponent(voice);
+  audio.play().catch(() => setStatus('Voice preview is unavailable.', 'err'));
 }
 
 function updateApprovalBadgeEdit(status) {
@@ -1209,6 +1539,7 @@ function updateApprovalBadgeEdit(status) {
 
 function setApproval(status) {
   if (selIdx < 0 || selIdx >= rows.length) return;
+  rememberSubtitleState();
   rows[selIdx].Approved = status;
   updateApprovalBadgeEdit(status);
   renderTable();
@@ -1220,6 +1551,7 @@ function setApproval(status) {
 }
 
 function toggleApproval(i) {
+  rememberSubtitleState();
   const cur = rows[i].Approved || 'pending';
   const cycle = { pending: 'approved', approved: 'rejected', rejected: 'pending' };
   rows[i].Approved = cycle[cur];
@@ -1228,6 +1560,7 @@ function toggleApproval(i) {
 }
 
 function toggleIgnore(i) {
+  rememberSubtitleState();
   rows[i].Ignore = !rows[i].Ignore;
   renderTable();
   syncToServer();
@@ -1238,6 +1571,7 @@ function toggleIgnore(i) {
 }
 
 function approveAll() {
+  rememberSubtitleState();
   rows.forEach(r => r.Approved = 'approved');
   renderTable();
   syncToServer();
@@ -1245,6 +1579,7 @@ function approveAll() {
 }
 
 function rejectAll() {
+  rememberSubtitleState();
   rows.forEach(r => r.Approved = 'rejected');
   renderTable();
   syncToServer();
@@ -1252,6 +1587,7 @@ function rejectAll() {
 }
 
 function resetApproval() {
+  rememberSubtitleState();
   rows.forEach(r => r.Approved = 'pending');
   renderTable();
   syncToServer();
@@ -1282,9 +1618,15 @@ function updateApprovalStats() {
 
 function saveEdit() {
   if (selIdx < 0 || selIdx >= rows.length) return;
-  rows[selIdx].Start       = document.getElementById('edit-start').value;
-  rows[selIdx].End         = document.getElementById('edit-end').value;
+  const start = document.getElementById('edit-start').value;
+  const end = document.getElementById('edit-end').value;
+  if (parseTime(end) <= parseTime(start)) return setStatus('❌ End time must be after start time.', 'err');
+  rememberSubtitleState();
+  rows[selIdx].Start       = start;
+  rows[selIdx].End         = end;
   rows[selIdx].Translation = document.getElementById('edit-text').value;
+  rows[selIdx].Speaker     = document.getElementById('edit-speaker').value.trim() || 'Unknown';
+  rows[selIdx].Voice       = document.getElementById('edit-voice').value;
   rows[selIdx].Edited      = true;
   const nextIdx = selIdx + 1;
   renderTable();
@@ -1302,10 +1644,33 @@ function clearEdit() {
   document.getElementById('edit-start').value = '';
   document.getElementById('edit-end').value = '';
   document.getElementById('edit-text').value = '';
+  document.getElementById('edit-speaker').value = '';
+  document.getElementById('edit-duration').value = '0.000 s';
+  document.getElementById('edit-voice').value = '';
   renderTable();
 }
 
+async function alignReplacementSubtitles() {
+  const subtitlesPath = document.getElementById('sub-path').value.trim();
+  if (!rows.length) return setStatus('❌ Generate the Whisper timeline first.', 'err');
+  if (!subtitlesPath) return setStatus('❌ Upload the replacement SRT/ASS file first.', 'err');
+  setStatus('🧩 Aligning replacement text to the original timeline…', 'busy');
+  try {
+    const response = await fetch('/api/subtitles/align', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({subtitles_path: subtitlesPath})
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Alignment failed');
+    rememberSubtitleState();
+    rows = data.rows;
+    renderTable();
+    setStatus(`✅ Aligned ${data.source_count} subtitle entries to ${rows.length} original timing segments.`, 'ok');
+  } catch (error) { setStatus('❌ ' + error.message, 'err'); }
+}
+
 function addSubtitle() {
+  rememberSubtitleState();
   const last = rows[rows.length - 1];
   const lastEnd = last ? parseTime(last.End) : 0;
   rows.push({
@@ -1329,6 +1694,7 @@ function splitSubtitle() {
   const mid = Math.floor(text.length / 2);
   const t1 = text.slice(0, mid).trim(), t2 = text.slice(mid).trim();
   if (!t1 || !t2) return;
+  rememberSubtitleState();
   const start = parseTime(row.Start), end = parseTime(row.End);
   const midT = Math.floor((start + end) / 2);
   row.End = formatTime(midT); row.Original = t1; row.Translation = '';
@@ -1341,6 +1707,7 @@ function splitSubtitle() {
 
 function mergeSubtitle() {
   if (selIdx < 0 || selIdx >= rows.length - 1) return;
+  rememberSubtitleState();
   const r1 = rows[selIdx], r2 = rows[selIdx + 1];
   r1.Original = r1.Original + ' ' + r2.Original;
   r1.End = r2.End;
@@ -1354,6 +1721,7 @@ function mergeSubtitle() {
 
 function deleteSubtitle() {
   if (selIdx < 0) return;
+  rememberSubtitleState();
   rows.splice(selIdx, 1);
   selIdx = -1;
   renumber();
@@ -1371,6 +1739,7 @@ async function refreshSubtitles() {
   const d = await r.json();
   if (d.rows && d.rows.length) {
     rows = d.rows;
+    clearSubtitleUndoHistory();
     renderTable();
   }
 }
@@ -1551,6 +1920,7 @@ async function loadVideo() {
     target_lang: document.getElementById('target-lang').value,
     whisper_model: document.getElementById('whisper-model').value,
     hf_token: document.getElementById('hf-token').value,
+    num_speakers: parseInt(document.getElementById('num-speakers').value || '0', 10),
     subtitles_role: subRole,
   };
 
@@ -1561,6 +1931,25 @@ async function loadVideo() {
   loadVideoPollInterval = setInterval(async () => {
     const r = await fetch('/api/subtitles');
     const d = await r.json();
+
+    if (ytVal) {
+      const projectResponse = await fetch('/api/projects/active');
+      const projectData = await projectResponse.json();
+      const downloadedPath = projectData.project?.video_path || '';
+      if (downloadedPath) {
+        document.getElementById('video-path').value = downloadedPath;
+        document.getElementById('yt-url').value = '';
+        if (document.getElementById('video-player').dataset.path !== downloadedPath) {
+          document.getElementById('video-player').dataset.path = downloadedPath;
+          showCurrentProjectVideo();
+          setStatus(
+            currentLang === 'pl' ? 'Film pobrany i automatycznie wczytany. Trwa analiza…' : 'Video downloaded and loaded automatically. Analysis continues…',
+            'busy'
+          );
+        }
+      }
+    }
+
     if (d.rows && d.rows.length) {
       rows = d.rows;
       renderTable();
@@ -1569,10 +1958,7 @@ async function loadVideo() {
       
 
       if (pathVal && !uploadedVideoPath) {
-        const vp = document.getElementById('video-player');
-        vp.src = 'file://' + pathVal;
-        vp.style.display = 'block';
-        document.getElementById('video-placeholder').style.display = 'none';
+        showCurrentProjectVideo();
       }
     }
     if (++attempts > 300) stopLoadVideoPolling();
@@ -1680,8 +2066,158 @@ async function analyzeContext() {
 
 
 let dubbingPollInterval = null;
+let reviewPreparePoll = null;
+let reviewChunks = [];
+let reviewVoiceNames = [];
+
+function dubbingRequestBody() {
+  return {
+    target_lang: document.getElementById('dub-lang').value,
+    voice: document.getElementById('voice-select').value,
+    tts_engine: document.getElementById('tts-engine').value,
+    keep_bg: document.getElementById('keep-bg').checked,
+    hardsub: document.getElementById('hardsub').checked,
+    validation_model: document.getElementById('validation-model').value,
+    output_video_path: document.getElementById('output-video-path').value,
+    auto_retry_count: parseInt(document.getElementById('auto-retry-count')?.value || 10),
+    audio_enhance: document.getElementById('audio-enhance')?.checked || false,
+    enhance_method: document.getElementById('enhance-method')?.value || 'dsp_denoise',
+    lipsync: document.getElementById('lipsync')?.checked || false,
+  };
+}
 
 async function generateDubbing() {
+  await syncToServer();
+  if (!rows.some(r => r.Translation && r.Translation.trim())) {
+    return setStatus(currentLang === 'pl' ? '⚠️ Najpierw przetłumacz dialogi.' : '⚠️ Translate the dialogue first.', 'err');
+  }
+
+  setStatus(currentLang === 'pl' ? '🎙️ Generuję osobne kwestie do Timeline Review…' : '🎙️ Generating dialogue for Timeline Review…', 'busy');
+  document.getElementById('btn-generate').style.display = 'none';
+  document.getElementById('btn-cancel-generate').style.display = 'inline-flex';
+
+  const response = await fetch('/api/dubbing/review/prepare', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(dubbingRequestBody()),
+  });
+  const started = await response.json();
+  if (!response.ok) {
+    stopDubbingPolling();
+    return setStatus('❌ ' + (started.error || 'Timeline Review error'), 'err');
+  }
+
+  reviewPreparePoll = setInterval(async () => {
+    const statusResponse = await fetch('/api/dubbing/review/status');
+    const status = await statusResponse.json();
+    if (status.error) {
+      clearInterval(reviewPreparePoll); reviewPreparePoll = null;
+      stopDubbingPolling();
+      return setStatus('❌ ' + status.error, 'err');
+    }
+    if (status.ready) {
+      clearInterval(reviewPreparePoll); reviewPreparePoll = null;
+      reviewChunks = status.chunks || [];
+      rows.forEach(row => { if (!row.Ignore) row.Approved = 'pending'; });
+      const voicesResponse = await fetch('/api/voices');
+      const voicesData = await voicesResponse.json();
+      reviewVoiceNames = (voicesData.voices || []).filter(v => v !== 'Default');
+      renderTimelineReview();
+      document.getElementById('timeline-review-modal').style.display = 'flex';
+      stopDubbingPolling();
+      setStatus('🎬 Timeline Review — sprawdź i zatwierdź dialogi.', 'busy');
+    }
+  }, 1200);
+}
+
+function renderTimelineReview() {
+  const body = document.getElementById('timeline-review-body');
+  body.innerHTML = '';
+  rows.forEach((row, index) => {
+    const meta = reviewChunks[index] || {actual_ms:0, slot_ms:Math.max(0, parseTime(row.End)-parseTime(row.Start)), overflow_ms:0};
+    meta.slot_ms = Math.max(0, parseTime(row.End) - parseTime(row.Start));
+    meta.overflow_ms = Math.max(0, meta.actual_ms - meta.slot_ms);
+    const ratio = meta.actual_ms ? Math.min(100, meta.slot_ms / meta.actual_ms * 100) : 100;
+    const fits = meta.overflow_ms <= 0;
+    const voiceOptions = ['<option value="">Auto / głos rozmówcy</option>'].concat(
+      reviewVoiceNames.map(v => `<option value="${esc(v)}"${row.Voice===v?' selected':''}>${esc(v)}</option>`)
+    ).join('');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${index + 1}</td>
+      <td><input value="${row.Start}" onchange="reviewTimeChanged(${index},'Start',this.value)"/><input value="${row.End}" onchange="reviewTimeChanged(${index},'End',this.value)" style="margin-top:4px"/></td>
+      <td><strong style="color:${fits?'var(--green)':'var(--red)'}">${(meta.slot_ms/1000).toFixed(2)}s / ${(meta.actual_ms/1000).toFixed(2)}s</strong><div class="timeline-fit"><span class="${fits?'':'overflow'}" style="width:${ratio}%"></span></div>${fits?'':`<button class="btn btn-ghost btn-sm" style="margin-top:5px" onclick="fitReviewLine(${index})">Dopasuj +${(meta.overflow_ms/1000).toFixed(2)}s</button>`}</td>
+      <td><textarea rows="2" onchange="rows[${index}].Translation=this.value">${esc(row.Translation || row.Original || '')}</textarea></td>
+      <td><input value="${esc(row.Speaker || 'Unknown')}" onchange="rows[${index}].Speaker=this.value.trim()||'Unknown'"/></td>
+      <td><select onchange="rows[${index}].Voice=this.value">${voiceOptions}</select></td>
+      <td><button class="btn btn-ghost btn-sm" onclick="previewReviewChunk(${index})">▶ Audio</button><button class="btn btn-ghost btn-sm" onclick="previewReviewVideo(${index})">🎞 Wideo</button></td>
+      <td><button class="btn btn-sm ${row.Approved==='approved'?'btn-primary':row.Approved==='rejected'?'btn-danger':'btn-ghost'}" onclick="cycleReviewApproval(${index})">${row.Approved==='approved'?'✅ Akceptuj':row.Approved==='rejected'?'❌ Pomiń':'⏳ Sprawdź'}</button></td>`;
+    body.appendChild(tr);
+  });
+  const approved = rows.filter(r => r.Approved === 'approved').length;
+  const overflow = reviewChunks.filter((m,i) => m.actual_ms > Math.max(0, parseTime(rows[i].End)-parseTime(rows[i].Start))).length;
+  document.getElementById('timeline-review-summary').textContent = `${approved}/${rows.length} zatwierdzonych • ${overflow} dialogów za długich`;
+}
+
+function reviewTimeChanged(index, field, value) {
+  rows[index][field] = value;
+  renderTimelineReview();
+}
+function fitReviewLine(index) {
+  rows[index].End = formatTime(parseTime(rows[index].Start) + (reviewChunks[index]?.actual_ms || 0) + 80);
+  renderTimelineReview();
+}
+function autoRippleTimeline() {
+  for (let i=0;i<rows.length;i++) {
+    const actual = reviewChunks[i]?.actual_ms || Math.max(0,parseTime(rows[i].End)-parseTime(rows[i].Start));
+    const requiredEnd = parseTime(rows[i].Start) + actual + 80;
+    if (requiredEnd > parseTime(rows[i].End)) rows[i].End = formatTime(requiredEnd);
+    if (i+1 < rows.length && parseTime(rows[i].End) >= parseTime(rows[i+1].Start)) {
+      const duration = Math.max(100, parseTime(rows[i+1].End)-parseTime(rows[i+1].Start));
+      const nextStart = parseTime(rows[i].End) + 80;
+      rows[i+1].Start = formatTime(nextStart);
+      rows[i+1].End = formatTime(nextStart + duration);
+    }
+  }
+  renderTimelineReview();
+}
+function cycleReviewApproval(index) {
+  const cycle = {pending:'approved', approved:'rejected', rejected:'pending'};
+  rows[index].Approved = cycle[rows[index].Approved || 'pending'];
+  renderTimelineReview();
+}
+function approveAllReviewLines() {
+  rows.forEach((row,index) => {
+    const slot = Math.max(0,parseTime(row.End)-parseTime(row.Start));
+    if ((reviewChunks[index]?.actual_ms || 0) <= slot && !row.Ignore) row.Approved='approved';
+  });
+  renderTimelineReview();
+}
+function previewReviewChunk(index) { new Audio(`/api/dubbing/review/chunk/${index}?t=${Date.now()}`).play(); }
+function previewReviewVideo(index) {
+  const player=document.getElementById('video-player');
+  player.currentTime=parseTime(rows[index].Start)/1000; player.play();
+  const stop=()=>{if(player.currentTime>=parseTime(rows[index].End)/1000){player.pause();player.removeEventListener('timeupdate',stop);}};
+  player.addEventListener('timeupdate',stop);
+}
+function closeTimelineReview() { document.getElementById('timeline-review-modal').style.display='none'; setStatus('Timeline Review zapisany lokalnie.', ''); }
+async function regenerateTimelineAudio() {
+  await fetch('/api/subtitles/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rows})});
+  await syncToServer();
+  document.getElementById('timeline-review-modal').style.display='none';
+  await generateDubbing();
+}
+async function renderReviewedDubbing() {
+  const approved = rows.filter(r => r.Approved === 'approved').length;
+  if (!approved) return alert('Zatwierdź przynajmniej jeden dialog.');
+  if (rows.some(r => r.Approved === 'pending') && !confirm('Nie wszystkie dialogi są sprawdzone. Niezatwierdzone zostaną pominięte. Kontynuować?')) return;
+  await fetch('/api/subtitles/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rows})});
+  await syncToServer();
+  document.getElementById('timeline-review-modal').style.display='none';
+  renderTable();
+  startFinalDubbing();
+}
+
+async function startFinalDubbing() {
 
   await syncToServer();
 
@@ -1699,7 +2235,7 @@ async function generateDubbing() {
   document.getElementById('btn-generate').style.display = 'none';
   document.getElementById('btn-cancel-generate').style.display = 'inline-flex';
 
-  const autoAccept = document.getElementById('auto-accept')?.checked ?? true;
+  const autoAccept = false;
 
   const body = {
     target_lang: document.getElementById('dub-lang').value,
@@ -1713,6 +2249,8 @@ async function generateDubbing() {
     auto_retry_count: parseInt(document.getElementById('auto-retry-count')?.value || 10),
     audio_enhance: document.getElementById('audio-enhance')?.checked || false,
     enhance_method: document.getElementById('enhance-method')?.value || 'dsp_denoise',
+    lipsync: document.getElementById('lipsync')?.checked || false,
+    reuse_prepared_audio: true,
   };
   
   await fetch('/api/generate_dubbing', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
@@ -1746,6 +2284,7 @@ function stopDubbingPolling() {
 }
 
 async function cancelGenerateDubbing() {
+  if (reviewPreparePoll) { clearInterval(reviewPreparePoll); reviewPreparePoll = null; }
   await fetch('/api/generate_dubbing/cancel', { method: 'POST' });
   stopDubbingPolling();
   setStatus('Cancelled.', '');
@@ -1767,6 +2306,7 @@ async function resetApp() {
   await fetch('/api/reset', { method:'POST' });
   
   rows = [];
+  clearSubtitleUndoHistory();
   selIdx = -1;
   uploadedVideoPath = '';
   renderTable();
@@ -1795,6 +2335,78 @@ async function resetApp() {
   setStatus(i18n[currentLang].statusReady, 'ok');
 }
 
+/* ─── VOICE DB MODAL JS ─── */
+async function openVoiceDBModal() {
+  document.getElementById('voice-db-modal').style.display = 'flex';
+  await refreshVoiceDBList();
+}
+
+function closeVoiceDBModal() {
+  document.getElementById('voice-db-modal').style.display = 'none';
+}
+
+async function refreshVoiceDBList() {
+  const container = document.getElementById('voice-db-list');
+  container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--muted);">Ładowanie bazy głosów…</div>';
+  try {
+    const r = await fetch('/api/voices/database');
+    const data = await r.json();
+    const profiles = data.profiles || [];
+    if (profiles.length === 0) {
+      container.innerHTML = '<div style="text-align:center; padding:20px; color:var(--muted);">Brak zapisanych głosów w bazie. System automatycznie zapamięta głosy po pierwszym dubbingu.</div>';
+      return;
+    }
+    container.innerHTML = profiles.map(p => `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 14px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-radius:8px;">
+        <div>
+          <div style="font-weight:600; font-size:0.9rem; color:var(--text);">🎙️ ${esc(p.name)}</div>
+          <div style="font-size:0.75rem; color:var(--muted); margin-top:2px;">${currentLang === 'pl' ? 'Próbki' : 'Samples'}: ${p.duration_sec}s (${p.sample_count} ${currentLang === 'pl' ? 'fragmentów' : 'fragments'})</div>
+        </div>
+        <div style="display:flex; gap:8px;">
+          <button class="btn btn-danger btn-sm" onclick="deleteVoiceProfile('${esc(p.name)}')">${currentLang === 'pl' ? '🗑️ Usuń' : '🗑️ Delete'}</button>
+        </div>
+      </div>
+    `).join('');
+  } catch (e) {
+    container.innerHTML = `<div style="text-align:center; padding:20px; color:var(--red);">${currentLang === 'pl' ? 'Błąd ładowania bazy głosów' : 'Failed to load voice database'}: ${e}</div>`;
+  }
+}
+
+async function deleteVoiceProfile(name) {
+  if (!confirm(currentLang === 'pl'
+    ? `Czy na pewno chcesz usunąć profil głosu '${name}' z bazy?`
+    : `Are you sure you want to delete voice profile '${name}' from the database?`)) return;
+  try {
+    await fetch('/api/voices/database/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    await refreshVoiceDBList();
+  } catch (e) {
+    alert(`${currentLang === 'pl' ? 'Błąd podczas usuwania' : 'Delete failed'}: ${e}`);
+  }
+}
+
+async function importVoiceZip() {
+  const file = document.getElementById('voice-zip-file').files[0];
+  const name = document.getElementById('voice-zip-name').value.trim();
+  if (!file || !name) return alert('Select a ZIP file and enter the person name.');
+  const form = new FormData();
+  form.append('archive', file);
+  form.append('display_name', name);
+  form.append('source_movie', document.getElementById('voice-zip-source').value.trim());
+  setStatus('🧠 Importing samples and learning one voice profile…', 'busy');
+  try {
+    const response = await fetch('/api/voices/database/import', {method: 'POST', body: form});
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Import failed');
+    await refreshVoiceDBList();
+    await loadEditVoiceOptions(data.voice_id);
+    setStatus(`✅ Imported ${data.sample_files} files as one voice: ${name}`, 'ok');
+  } catch (error) { setStatus('❌ ' + error.message, 'err'); }
+}
+
 /* ─── INIT ─── */
 window.addEventListener('DOMContentLoaded', () => {
   if (!currentLang) {
@@ -1802,15 +2414,30 @@ window.addEventListener('DOMContentLoaded', () => {
   } else {
     applyLanguage(currentLang);
     showProjectManager();
+    setTimeout(showTestVersionNoticeOnce, 500);
   }
   
 
   checkOllama();
+  document.getElementById('edit-start').addEventListener('input', updateEditDuration);
+  document.getElementById('edit-end').addEventListener('input', updateEditDuration);
   
   document.getElementById('video-path').addEventListener('keydown', e => {
     if (e.key === 'Enter') loadVideo();
   });
 });
+
+document.addEventListener('keydown', event => {
+  if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'z' || event.shiftKey) return;
+  const target = event.target;
+  const usesNativeUndo = target && (
+    target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+  );
+  if (usesNativeUndo) return;
+  event.preventDefault();
+  undoSubtitleChange();
+});
 </script>
 </body>
 </html>
+/* https://youtu.be/iik25wqIuFo */

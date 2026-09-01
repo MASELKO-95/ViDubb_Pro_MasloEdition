@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-🔬 ViDubb Pro — TTS Compatibility Tester
+🔬 viDubb Pro — Maslo95 Edition — TTS Compatibility Tester
 =========================================
 Uruchom: python3 tools/tts_compat.py
 
@@ -24,7 +24,7 @@ from pathlib import Path
 WORKSPACE = Path(__file__).parent.parent
 sys.path.insert(0, str(WORKSPACE))
 
-# Testowe zdania per język
+# Representative synthesis text for each supported language.
 TEST_SENTENCES = {
     "pl": "Dzień dobry, to jest próba syntezy mowy w języku polskim.",
     "en": "Hello, this is a text-to-speech synthesis test in English.",

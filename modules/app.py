@@ -1,9 +1,11 @@
-# -*- coding: utf-8 -*-
-"""
-Main application factory for ViDubb Pro Flask server
-"""
 import os
+import platform
+import re
+import sys
 import warnings
+from pathlib import Path
+# TTS compatibility patches must run before importing Flask routes and services.
+# ruff: noqa: E402
 warnings.filterwarnings("ignore")
 
 # ====================== XTTS SAFE FIX (must be before any TTS import) ======================
@@ -25,13 +27,30 @@ except Exception:
     pass
 
 import requests
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, Response, jsonify, render_template, request
 from modules.config import MAX_CONTENT_LENGTH, LANGUAGE_MAPPING
 from modules.state import state
 from modules.routes.projects import projects_bp
 from modules.routes.video import video_bp
 from modules.routes.translate import translate_bp
 from modules.routes.dubbing import dubbing_bp
+
+APP_VERSION = "1.0.0-test"
+
+
+def _redact_diagnostic_text(value: str) -> str:
+    text = str(value or "")
+    home = str(Path.home())
+    if home:
+        text = text.replace(home, "<HOME>")
+    text = re.sub(r"hf_[A-Za-z0-9]{10,}", "hf_<REDACTED>", text)
+    text = re.sub(r"github_pat_[A-Za-z0-9_]{10,}", "github_pat_<REDACTED>", text)
+    text = re.sub(
+        r"(?i)((?:api[_-]?key|token|authorization)\s*[:=]\s*)\S+",
+        r"\1<REDACTED>",
+        text,
+    )
+    return text
 
 def get_ollama_models_list(custom_endpoint: str = None) -> list:
     urls_to_try = []
@@ -130,5 +149,34 @@ def create_app() -> Flask:
             "logs": state.get_logs(since=since),
             "total": state.get_total_logs()
         })
+
+    @app.route("/api/diagnostics/report")
+    def diagnostic_report():
+        project_name = (
+            state.active_project.name
+            if state.active_project
+            else "none"
+        )
+        logs = state.get_logs(max(0, state.get_total_logs() - 300))
+        report_lines = [
+            "viDubb Pro diagnostic report",
+            f"Version: {APP_VERSION}",
+            f"Python: {sys.version.split()[0]}",
+            f"Platform: {platform.platform()}",
+            f"Project: {project_name}",
+            "",
+            "Last application logs:",
+            *logs,
+        ]
+        report = _redact_diagnostic_text("\n".join(report_lines)) + "\n"
+        return Response(
+            report,
+            mimetype="text/plain; charset=utf-8",
+            headers={
+                "Content-Disposition": (
+                    "attachment; filename=vidubb-diagnostic-report.txt"
+                )
+            },
+        )
 
     return app

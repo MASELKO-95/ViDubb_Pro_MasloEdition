@@ -11,7 +11,7 @@ TTS==0.22.0
 openai-whisper==20240930
 pydub
 ffmpeg-python
-
+scikit-learn
 # CV/Face
 deepface==0.0.93
 opencv-python

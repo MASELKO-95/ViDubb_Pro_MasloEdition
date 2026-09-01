@@ -1,10 +1,10 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 import os
 import gc
 import argparse
 import subprocess
 import shutil
+# Model compatibility setup must run before importing model-backed libraries.
+# ruff: noqa: E402
 import requests
 import torch
 from torch.serialization import add_safe_globals
@@ -35,7 +35,7 @@ from pydub import AudioSegment
 GPU_AVAILABLE = torch.cuda.is_available()
 
 WHISPER_DEVICE = "cuda" if GPU_AVAILABLE else "cpu"
-XTTS_DEVICE = "cpu"                    # XTTS na CPU - najważniejsze dla 8GB GPU
+XTTS_DEVICE = "cpu"  # Keeps XTTS usable on GPUs with about 8 GB of VRAM.
 
 print("\n=== DEVICE SETUP ===")
 print("Whisper:", WHISPER_DEVICE)
@@ -161,7 +161,7 @@ STRICT RULES:
             print(f"⚠️ Model zwrócił za dużo linii ({len(cleaned)}), przycinam do {len(texts)}.")
             cleaned = cleaned[:len(texts)]
 
-        print("✅ Tłumaczenie udane (z uzupełnieniami)!")
+        print("✅ Translation completed (missing entries were filled in).")
 
 
         for orig, trans in zip(texts[:3], cleaned[:3]):
@@ -171,15 +171,15 @@ STRICT RULES:
         return cleaned
 
     except Exception as e:
-        print(f"Błąd tłumaczenia: {e}")
+        print(f"Translation failed: {e}")
         return texts
     finally:
 
-        print("🧹 Zwalnianie modelu Ollama...")
+        print("🧹 Releasing the Ollama model...")
         try:
             requests.post("http://localhost:11434/api/generate",
                          json={"model": "microai/suzume-llama3", "keep_alive": 0}, timeout=10)
-        except:
+        except requests.RequestException:
             pass
         gc.collect()
         torch.cuda.empty_cache()
@@ -237,7 +237,7 @@ def apply_lip_sync():
             "--wav2lip_batch_size", "8"
         ], check=True)
         print("✅ Lip sync done")
-    except:
+    except subprocess.CalledProcessError:
         subprocess.run(["ffmpeg", "-y", "-i", "video.mp4", "-i", "final_dub.wav", "-c:v", "copy", "-map", "0:v:0", "-map", "1:a:0", "-shortest", "output.mp4"], check=True)
 
 def cleanup():
@@ -257,7 +257,7 @@ def main():
     print("Translating...")
     translated = translate_batch(text, args.source_language, args.target_language)
 
-    # Opcjonalnie: zapisz przetłumaczony tekst do pliku
+    # Optionally save the translated text to a file.
     with open("translated_lines.txt", "w", encoding="utf-8") as f:
         for line in translated:
             f.write(line + "\n")
