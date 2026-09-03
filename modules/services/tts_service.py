@@ -143,11 +143,20 @@ def _build_speaker_references(
                 start_ms, end_ms = timestamps[i]
                 duration = end_ms - start_ms
 
-                if duration > 150:
-                    ctx = 250
-                    safe_start = max(0, start_ms - ctx)
-                    safe_end = min(len(base_audio), end_ms + ctx)
+                if duration >= 700:
+                    # Padding must never borrow audio from the neighbouring
+                    # subtitle, which may belong to another actor.
+                    left_limit = 0
+                    right_limit = len(base_audio)
+                    if i > 0:
+                        left_limit = max(0, (int(timestamps[i - 1][1]) + start_ms) // 2)
+                    if i + 1 < len(timestamps):
+                        right_limit = min(len(base_audio), (end_ms + int(timestamps[i + 1][0])) // 2)
+                    safe_start = max(left_limit, start_ms - 180)
+                    safe_end = min(right_limit, end_ms + 220)
                     chunk = base_audio[safe_start:safe_end]
+                    if chunk.rms <= 0 or chunk.dBFS < -45.0:
+                        continue
                     chunks_list.append(chunk)
                     combined_audio += chunk
                     combined_audio += AudioSegment.silent(duration=50)
@@ -554,6 +563,15 @@ def generate_dubbed_audio(
         if xtts_lang != target_lang_code:
             state.add_log(f"  ⚠️ XTTS nie obsługuje '{target_lang_code}' — używam '{xtts_lang}'.")
 
+        # Emotion/prosody references are optional and backward compatible.
+        from modules.services.voice_db_service import load_voice_db, _prosody_label
+        emotion_db = load_voice_db()
+        try:
+            source_prosody_audio = AudioSegment.from_file(video_path)
+        except Exception:
+            source_prosody_audio = None
+        emotion_usage = {}
+
         for i, text in enumerate(translated_texts):
             if state.cancel_flags["dubbing"]:
                 break
@@ -592,6 +610,19 @@ def generate_dubbed_audio(
                     AudioSegment.silent(duration=1000).export(chunk_path, format="wav")
                 continue
 
+            base_ref_path = ref_path
+            if source_prosody_audio is not None and i < len(timestamps):
+                start_ms, end_ms = timestamps[i]
+                source_chunk = source_prosody_audio[max(0, start_ms):min(len(source_prosody_audio), end_ms)]
+                emotion = _prosody_label(source_chunk)
+                profile_id = os.path.splitext(os.path.basename(base_ref_path))[0]
+                profile = emotion_db.get(profile_id, {}) if isinstance(emotion_db, dict) else {}
+                emotion_refs = profile.get("emotion_references", {}) if isinstance(profile, dict) else {}
+                emotion_ref = str(emotion_refs.get(emotion, "") or "") if isinstance(emotion_refs, dict) else ""
+                if emotion_ref and os.path.isfile(emotion_ref):
+                    ref_path = emotion_ref
+                    emotion_usage[emotion] = emotion_usage.get(emotion, 0) + 1
+
             success = False
             for attempt in range(max_retries):
                 if state.cancel_flags["dubbing"]:
@@ -625,6 +656,10 @@ def generate_dubbed_audio(
 
             if (i + 1) % 10 == 0 or i + 1 == total:
                 state.add_log(f"  XTTS: {i + 1}/{total} linii…")
+
+        if emotion_usage:
+            summary = ", ".join(f"{key}={value}" for key, value in sorted(emotion_usage.items()))
+            state.add_log(f"  🎭 Referencje prozodii XTTS: {summary}")
 
         if tts_model is not None:
             del tts_model

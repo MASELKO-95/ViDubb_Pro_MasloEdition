@@ -3,7 +3,27 @@ import json
 import time
 import pandas as pd
 from typing import Dict, List, Optional
+from pathlib import Path
 from modules.config import PROJECTS_DIR, RESULTS_DIR
+
+
+def normalize_project_name(value: object) -> str:
+    """Return a safe project name or raise ValueError for ambiguous input."""
+    name = str(value or "").strip()
+    if not name or len(name) > 100:
+        raise ValueError("Project name must contain between 1 and 100 characters")
+    if any(not (char.isalnum() or char in " _-") for char in name):
+        raise ValueError("Project name contains unsupported characters")
+    return name
+
+
+def project_file_path(name: object) -> Path:
+    safe_name = normalize_project_name(name)
+    root = Path(PROJECTS_DIR).resolve()
+    path = (root / f"{safe_name}.json").resolve()
+    if path.parent != root:
+        raise ValueError("Project path is outside the projects directory")
+    return path
 
 class Project:
     def __init__(self, name: str):
@@ -104,7 +124,7 @@ class Project:
 
     def save(self):
         self.updated_at = time.time()
-        filepath = os.path.join(PROJECTS_DIR, f"{self.name}.json")
+        filepath = project_file_path(self.name)
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(self.to_dict(), f, indent=4, ensure_ascii=False)
 
@@ -179,7 +199,8 @@ class AppState:
         return projects
 
     def load_project(self, name: str) -> Project:
-        filepath = os.path.join(PROJECTS_DIR, f"{name}.json")
+        name = normalize_project_name(name)
+        filepath = project_file_path(name)
         project = Project(name)
         if os.path.exists(filepath):
             with open(filepath, "r", encoding="utf-8") as f:
@@ -191,7 +212,7 @@ class AppState:
         return project
 
     def delete_project(self, name: str) -> bool:
-        filepath = os.path.join(PROJECTS_DIR, f"{name}.json")
+        filepath = project_file_path(name)
         if os.path.exists(filepath):
             os.remove(filepath)
             if self.active_project and self.active_project.name == name:

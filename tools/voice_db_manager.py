@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import shutil
@@ -647,10 +648,54 @@ class VoiceDBManager(tk.Tk):
             messagebox.showerror("Eksport", f"Nie udało się utworzyć paczki:\n{exc}")
 
 
-def main():
+def _run_cli_import(args: argparse.Namespace) -> int:
+    folder = Path(args.import_folder).expanduser().resolve()
+    if not folder.is_dir():
+        print(f"❌ Katalog nie istnieje: {folder}", file=sys.stderr)
+        return 2
+    display_name = str(args.name or "").strip()
+    if not display_name:
+        print("❌ Przy imporcie wymagane jest --name.", file=sys.stderr)
+        return 2
+    voice_id = import_voice_from_folder(
+        folder_path=str(folder),
+        display_name=display_name,
+        source_movie=str(args.source or ""),
+        description=str(args.description or "Imported with Voice DB Manager CLI"),
+        existing_voice_id=str(args.update or ""),
+    )
+    if not voice_id:
+        print("❌ Nie udało się utworzyć profilu głosu.", file=sys.stderr)
+        return 1
+    set_visibility(voice_id, args.visibility)
+    info = load_voice_db().get(voice_id, {})
+    print("\n✅ Import zakończony")
+    print(f"Voice ID: {voice_id}")
+    print(f"Nazwa: {display_name}")
+    print(f"Pliki zaakceptowane: {info.get('sample_count', 0)}")
+    print(f"Referencja XTTS: {info.get('wav_path', '')}")
+    print(f"Widoczność: {args.visibility}")
+    return 0
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Zarządzanie bazą głosów ViDubb (GUI lub CLI).")
+    parser.add_argument("--import-folder", "--folder", dest="import_folder", help="Katalog próbek jednej osoby")
+    parser.add_argument("--name", help="Nazwa osoby/głosu")
+    parser.add_argument("--source", default="", help="Film, serial lub inne źródło")
+    parser.add_argument("--description", default="", help="Opis profilu")
+    parser.add_argument("--visibility", choices=("private", "public"), default="private")
+    parser.add_argument("--update", metavar="VOICE_ID", default="", help="Aktualizuj istniejący profil zamiast tworzyć nowy")
+    parser.add_argument("--gui", action="store_true", help="Uruchom interfejs graficzny")
+    args = parser.parse_args(argv)
+    if args.import_folder:
+        return _run_cli_import(args)
+    if args.name and not args.gui:
+        parser.error("--name wymaga również --import-folder")
     app = VoiceDBManager()
     app.mainloop()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

@@ -145,24 +145,46 @@ def _map_diarization_to_timestamps(
     state.add_log(f"  📊 Pyannote wykrył {len(turns)} fragmentów speakerów.")
 
     result = []
-    for start_ms, end_ms in timestamps:
+    refined_count = 0
+    for index, (start_ms, end_ms) in enumerate(timestamps):
         s_sec = max(0.0, start_ms / 1000.0)
         e_sec = max(s_sec, end_ms / 1000.0)
 
         best_speaker = "Unknown"
         best_overlap = 0.0
 
+        overlap_by_speaker = {}
+        matching_turns = []
         for turn_start, turn_end, speaker in turns:
             overlap = max(0.0, min(e_sec, turn_end) - max(s_sec, turn_start))
+            if overlap > 0:
+                overlap_by_speaker[speaker] = overlap_by_speaker.get(speaker, 0.0) + overlap
+                matching_turns.append((overlap, turn_start, turn_end, speaker))
             if overlap > best_overlap:
                 best_overlap = overlap
                 best_speaker = speaker
 
         result.append(best_speaker)
+        # Pyannote exposes exact speaker turns. If a subtitle really contains
+        # two voices, retain only the largest turn of the assigned speaker.
+        meaningful = [value for value in overlap_by_speaker.values() if value >= 0.20]
+        slot = max(0.001, e_sec - s_sec)
+        foreign = sum(value for speaker, value in overlap_by_speaker.items() if speaker != best_speaker)
+        if len(meaningful) >= 2 and foreign / slot >= 0.15:
+            own_turns = [item for item in matching_turns if item[3] == best_speaker]
+            if own_turns:
+                _overlap, turn_start, turn_end, _speaker = max(own_turns)
+                new_start = max(start_ms, int(turn_start * 1000) - 60)
+                new_end = min(end_ms, int(turn_end * 1000) + 60)
+                if new_end - new_start >= 300:
+                    timestamps[index] = (new_start, new_end)
+                    refined_count += 1
 
     known = [speaker for speaker in result if speaker != "Unknown"]
     unique_speakers = len(set(known))
     state.add_log(f"  👥 Przypisano {unique_speakers} speakerów do {len(result)} segmentów.")
+    if refined_count:
+        state.add_log(f"  ✂️ Ponowna kontrola: przycięto {refined_count} segmentów zawierających dwa głosy.")
 
     return result
 

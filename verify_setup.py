@@ -1,5 +1,8 @@
+import os
 import sys
 import importlib
+
+os.environ.setdefault("PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION", "python")
 
 packages = [
     "pyannote.audio",
@@ -19,7 +22,7 @@ for pkg in packages:
     try:
         importlib.import_module(pkg)
         print(f"[OK] {pkg}")
-    except ImportError as e:
+    except Exception as e:
         print(f"[FAILED] {pkg}: {e}")
         missing.append(pkg)
 

@@ -72,7 +72,7 @@ import requests
 # ============================================================
 
 APP_NAME = "viDubb Pro — Maslo95 Edition"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1a"
 
 REQUIREMENTS_FILE = "requirements.txt"
 VENV_DIR = ".venv"

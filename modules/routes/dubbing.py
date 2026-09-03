@@ -1,5 +1,6 @@
 import gc
 import os
+import shutil
 import threading
 import tempfile
 import zipfile
@@ -34,6 +35,28 @@ _review_state = {
     "ready": False,
     "error": "",
 }
+
+MAX_VOICE_ZIP_FILES = 5000
+MAX_VOICE_ZIP_UNPACKED_BYTES = 2 * 1024 * 1024 * 1024
+MAX_VOICE_ZIP_MEMBER_BYTES = 256 * 1024 * 1024
+MAX_VOICE_ZIP_COMPRESSION_RATIO = 250
+
+@dubbing_bp.route("/api/select_output_folder", methods=["POST"])
+def select_output_folder():
+    """Open a native folder picker for this local desktop-style application."""
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+        root = tk.Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        initial = RESULTS_DIR if os.path.isdir(RESULTS_DIR) else os.getcwd()
+        folder = filedialog.askdirectory(title="Wybierz katalog zapisu filmu", initialdir=initial)
+        root.destroy()
+        return jsonify({"folder": folder or ""})
+    except Exception as exc:
+        state.add_log(f"⚠️ Systemowy wybór katalogu nie jest dostępny: {exc}")
+        return jsonify({"error": "Nie udało się otworzyć systemowego wyboru katalogu."}), 500
 
 
 # ============================================================
@@ -273,6 +296,10 @@ def run_generate_dubbing():
             RESULTS_DIR,
             f"{state.active_project.name}_output.mp4"
         )
+    output_video_path = os.path.abspath(os.path.expanduser(output_video_path))
+    if Path(output_video_path).suffix.lower() != ".mp4":
+        output_video_path += ".mp4"
+    os.makedirs(os.path.dirname(output_video_path), exist_ok=True)
 
     state.cancel_flags["dubbing"] = False
 
@@ -453,10 +480,9 @@ def run_generate_dubbing():
             if lipsync:
                 from modules.services.lipsync_service import run_lipsync
 
-                lipsync_out = os.path.join(
-                    RESULTS_DIR,
-                    f"{state.active_project.name}_lipsynced.mp4"
-                )
+                output_parent = os.path.dirname(output_video_path)
+                output_stem = Path(output_video_path).stem
+                lipsync_out = os.path.join(output_parent, f"{output_stem}_lipsynced.mp4")
 
                 res_path = run_lipsync(
                     video_path=output_video_path,
@@ -683,11 +709,21 @@ def import_voice_profile_api():
                 ]
                 if not members:
                     return jsonify({"error": "The ZIP contains no supported audio files"}), 400
+                if len(members) > MAX_VOICE_ZIP_FILES:
+                    return jsonify({"error": "The ZIP contains too many audio files"}), 400
+                unpacked_size = sum(max(0, info.file_size) for info in members)
+                if unpacked_size > MAX_VOICE_ZIP_UNPACKED_BYTES:
+                    return jsonify({"error": "The unpacked ZIP is too large"}), 413
                 for index, info in enumerate(members):
+                    if info.file_size > MAX_VOICE_ZIP_MEMBER_BYTES:
+                        return jsonify({"error": f"Audio file is too large: {Path(info.filename).name}"}), 413
+                    ratio = info.file_size / max(1, info.compress_size)
+                    if ratio > MAX_VOICE_ZIP_COMPRESSION_RATIO:
+                        return jsonify({"error": "The ZIP has a suspicious compression ratio"}), 400
                     # Flatten paths and generate safe names to prevent ZIP path traversal.
                     target = samples_dir / f"{index:04d}_{secure_filename(Path(info.filename).name)}"
                     with bundle.open(info) as source, open(target, "wb") as destination:
-                        destination.write(source.read())
+                        shutil.copyfileobj(source, destination, length=1024 * 1024)
         except zipfile.BadZipFile:
             return jsonify({"error": "The uploaded file is not a valid ZIP archive"}), 400
 

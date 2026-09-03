@@ -127,6 +127,7 @@ class ViDubbRequestHandler(WSGIRequestHandler):
 # ============================================================
 
 from modules.app import create_app
+from modules.config import APP_VERSION
 
 app = create_app()
 
@@ -147,7 +148,7 @@ if __name__ == "__main__":
 
     print(
         "🚀 Starting viDubb Pro — "
-        "Maslo95 Edition Flask Server..."
+        f"Maslo95 Edition v{APP_VERSION} Flask Server..."
     )
     print(
         "   URL: http://127.0.0.1:7860"
@@ -163,8 +164,9 @@ if __name__ == "__main__":
             "(set VIDUBB_HTTP_LOGS=1 to enable)"
         )
 
+    host = os.environ.get("VIDUBB_HOST", "127.0.0.1").strip() or "127.0.0.1"
     app.run(
-        host="0.0.0.0",
+        host=host,
         port=7860,
         debug=False,
         request_handler=ViDubbRequestHandler,

@@ -1,14 +1,22 @@
 # Core
+Flask>=3.0,<4
+pandas>=1.4,<2
 pyannote.audio==3.3.2
 speechbrain==1.0.2
 audio-separator==0.24.1
 yt-dlp
 groq==0.13.0
 python-dotenv
+requests>=2.31,<3
+urllib3>=2,<3
+charset-normalizer>=3,<4
+chardet>=5,<6
 
 # Audio/TTS
 TTS==0.22.0
 openai-whisper==20240930
+faster-whisper>=1.0,<2
+edge-tts>=6.1,<8
 pydub
 ffmpeg-python
 scikit-learn
@@ -24,8 +32,7 @@ transformers==4.36.2
 torch>=2.6.0
 torchaudio>=2.6.0
 torchvision>=0.21.0
-protobuf==3.19.6
-requests>=2.31.0
+protobuf==3.20.3
 nltk==3.8.1
 ascii-magic
 

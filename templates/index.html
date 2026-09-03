@@ -724,7 +724,10 @@
         </div>
         
         <label data-i18n="outputPathLabel">Ścieżka zapisu wideo</label>
-        <input type="text" id="output-video-path" placeholder="/ścieżka/do/wyniku.mp4"/>
+        <div style="display:flex;gap:6px;">
+          <input type="text" id="output-video-path" placeholder="/ścieżka/do/wyniku.mp4" style="flex:1;"/>
+          <button type="button" class="btn btn-ghost" onclick="selectOutputFolder()">📁 Wybierz folder</button>
+        </div>
 
         <!-- Approval / Auto-Accept -->
         <div style="margin-top:10px; padding:10px 12px; border-radius:8px; background:rgba(16,185,129,0.06); border:1px solid rgba(16,185,129,0.2);">
@@ -786,7 +789,7 @@
 /* ═══════════════════════ TRANSLATION I18N ═══════════════════════ */
 const i18n = {
   pl: {
-    title: "🎬 viDubb Pro — Maslo95 Edition v1.0.0",
+    title: "🎬 viDubb Pro — Maslo95 Edition v1.0.1a",
     supportProject: "Wesprzyj viDubb Pro:",
     resetBtn: "🔄 Reset",
     exportSrt: "💾 Eksportuj SRT",
@@ -871,7 +874,7 @@ const i18n = {
     statusError: "Błąd."
   },
   en: {
-    title: "🎬 viDubb Pro — Maslo95 Edition v1.0.0",
+    title: "🎬 viDubb Pro — Maslo95 Edition v1.0.1a",
     supportProject: "Support viDubb Pro:",
     resetBtn: "🔄 Reset",
     exportSrt: "💾 Export SRT",
@@ -2069,6 +2072,19 @@ let dubbingPollInterval = null;
 let reviewPreparePoll = null;
 let reviewChunks = [];
 let reviewVoiceNames = [];
+
+async function selectOutputFolder() {
+  const response = await fetch('/api/select_output_folder', {method:'POST'});
+  const data = await response.json();
+  if (!response.ok) return setStatus('⚠️ ' + (data.error || 'Nie udało się wybrać folderu.'), 'err');
+  if (!data.folder) return;
+  const current = document.getElementById('output-video-path').value.trim();
+  const currentName = current.split(/[\\/]/).pop();
+  const projectName = String(activeProject?.name || 'vidubb').replace(/[^A-Za-z0-9._-]+/g, '_');
+  const filename = currentName && currentName.toLowerCase().endsWith('.mp4') ? currentName : `${projectName}_output.mp4`;
+  const separator = data.folder.includes('\\') ? '\\' : '/';
+  document.getElementById('output-video-path').value = data.folder.replace(/[\\/]+$/, '') + separator + filename;
+}
 
 function dubbingRequestBody() {
   return {

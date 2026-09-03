@@ -274,6 +274,64 @@ def _collect_and_resegment(raw_segments: Iterable[Any]) -> list[DialogueSegment]
 # PUBLIC API
 # ============================================================
 
+def _transcribe_loaded_model(model: WhisperModel, video_path: str, lang_arg: str | None):
+    raw_segments, info = model.transcribe(
+        video_path,
+        word_timestamps=True,
+        language=lang_arg,
+        vad_filter=True,
+        vad_parameters={
+            "min_silence_duration_ms": VAD_MIN_SILENCE_MS,
+            "speech_pad_ms": VAD_SPEECH_PAD_MS,
+        },
+        beam_size=5,
+        temperature=0.0,
+    )
+    return _collect_and_resegment(raw_segments), info
+
+
+class WhisperBatchSession:
+    """Reusable Whisper model for processing many files without reloading weights."""
+
+    def __init__(self, model_size: str = "turbo", language: str = "auto"):
+        self.model_size = model_size
+        self.language = language
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.model = None
+        self._load_model()
+
+    def _load_model(self) -> None:
+        compute_type = "float16" if self.device == "cuda" else "int8"
+        state.add_log(f"🎤 Ładowanie jednej sesji Whisper ({self.device}, {compute_type})...")
+        self.model = WhisperModel(self.model_size, device=self.device, compute_type=compute_type)
+
+    def transcribe(self, video_path: str) -> tuple[list[DialogueSegment], str]:
+        lang_arg = None if self.language in ("auto", "", None) else self.language
+        try:
+            segments, info = _transcribe_loaded_model(self.model, video_path, lang_arg)
+        except RuntimeError as exc:
+            oom = self.device == "cuda" and ("out of memory" in str(exc).lower() or "cuda failed" in str(exc).lower())
+            if not oom:
+                raise
+            state.add_log("  ⚠️ Brak VRAM w sesji zbiorczej — dalsza analiza przechodzi na CPU.")
+            self.close()
+            self.device = "cpu"
+            self._load_model()
+            segments, info = _transcribe_loaded_model(self.model, video_path, lang_arg)
+        return segments, (getattr(info, "language", None) or self.language)
+
+    def close(self) -> None:
+        if getattr(self, "model", None) is not None:
+            del self.model
+            self.model = None
+        _cleanup_torch()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, _exc_type, _exc, _tb):
+        self.close()
+
 def transcribe_video(
     video_path: str,
     model_size: str = "turbo",
@@ -309,19 +367,7 @@ def transcribe_video(
                 device=device,
                 compute_type=compute_type,
             )
-            raw_segments, info = model.transcribe(
-                video_path,
-                word_timestamps=True,
-                language=lang_arg,
-                vad_filter=True,
-                vad_parameters={
-                    "min_silence_duration_ms": VAD_MIN_SILENCE_MS,
-                    "speech_pad_ms": VAD_SPEECH_PAD_MS,
-                },
-                beam_size=5,
-                temperature=0.0,
-            )
-            rebuilt_segments = _collect_and_resegment(raw_segments)
+            rebuilt_segments, info = _transcribe_loaded_model(model, video_path, lang_arg)
             detected = getattr(info, "language", None) or language
             state.add_log(
                 f"  ✅ Whisper finished: language={detected}, "

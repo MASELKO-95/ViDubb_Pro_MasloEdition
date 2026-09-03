@@ -7,6 +7,7 @@ import os
 import re
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -456,6 +457,71 @@ def _cap_reference(audio: AudioSegment) -> AudioSegment:
     if len(audio) <= MAX_REF_DURATION_MS:
         return audio
     return audio[:MAX_REF_DURATION_MS]
+
+
+def _load_import_candidate(path: Path) -> tuple[Path, AudioSegment | None, float]:
+    """Decode/clean one file. Safe to run in the bounded import worker pool."""
+    try:
+        audio = AudioSegment.from_file(path).set_channels(1).set_sample_width(2)
+        if not _is_usable_audio(audio):
+            return path, None, -999.0
+        audio = _speech_only(audio)
+        if len(audio) < MIN_SPEECH_SEGMENT_MS:
+            return path, None, -999.0
+        # Do not let a single long recording dominate the reference candidate set.
+        audio = audio[:MAX_SPEECH_SEGMENT_MS]
+        peak_room = max(0.0, -1.0 - float(audio.max_dBFS))
+        score = min(len(audio), 6000) / 1000.0 - peak_room * 0.08
+        return path, audio, score
+    except Exception as exc:
+        state.add_log(f"  ⚠️ Nie udało się załadować {path.name}: {exc}")
+        return path, None, -999.0
+
+
+def _prosody_label(audio: AudioSegment) -> str:
+    """Lightweight acoustic buckets used to select a matching XTTS reference."""
+    if not audio or not np.isfinite(audio.dBFS):
+        return "neutral"
+    mono = audio.set_channels(1).set_frame_rate(16000).set_sample_width(2)
+    samples = np.asarray(mono.get_array_of_samples(), dtype=np.float32)
+    zcr = float(np.mean(np.signbit(samples[1:]) != np.signbit(samples[:-1]))) if samples.size > 1 else 0.0
+    if audio.dBFS > -16.0 and zcr > 0.08:
+        return "intense"
+    if audio.dBFS < -30.0:
+        return "soft"
+    if zcr > 0.14:
+        return "bright"
+    if zcr < 0.035 and audio.dBFS > -24.0:
+        return "low_calm"
+    return "neutral"
+
+
+def _build_diverse_reference(candidates: list[tuple[Path, AudioSegment, float]]) -> AudioSegment:
+    """Choose material across quiet/normal/energetic files instead of the first 30 s."""
+    if not candidates:
+        return AudioSegment.empty()
+    ordered = sorted(candidates, key=lambda item: float(item[1].dBFS))
+    buckets = [ordered[i::4] for i in range(4)]
+    for bucket in buckets:
+        bucket.sort(key=lambda item: item[2], reverse=True)
+    selected = AudioSegment.empty()
+    while len(selected) < MAX_REF_DURATION_MS and any(buckets):
+        progressed = False
+        for bucket in buckets:
+            if not bucket or len(selected) >= MAX_REF_DURATION_MS:
+                continue
+            _path, audio, _score = bucket.pop(0)
+            remaining = MAX_REF_DURATION_MS - len(selected)
+            if len(selected):
+                silence = min(90, remaining)
+                selected += AudioSegment.silent(duration=silence)
+                remaining -= silence
+            if remaining > 0:
+                selected += audio[:remaining]
+                progressed = True
+        if not progressed:
+            break
+    return selected
 
 
 # ============================================================
@@ -1044,6 +1110,7 @@ def import_voice_from_folder(
     display_name: str,
     source_movie: str = "",
     description: str = "",
+    existing_voice_id: str = "",
 ) -> str:
     """Importuje wspierane pliki audio z folderu do jednego profilu."""
     folder = Path(folder_path)
@@ -1056,11 +1123,7 @@ def import_voice_from_folder(
 
     supported = {".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac"}
     audio_files = sorted(
-        [
-            p
-            for p in folder.iterdir()
-            if p.is_file() and p.suffix.lower() in supported
-        ],
+        [p for p in folder.rglob("*") if p.is_file() and p.suffix.lower() in supported],
         key=lambda p: p.name.lower(),
     )
 
@@ -1070,28 +1133,36 @@ def import_voice_from_folder(
 
     state.add_log(f"  🎵 Znaleziono {len(audio_files)} plików audio.")
 
-    combined = AudioSegment.empty()
-    loaded_files = 0
+    workers = max(1, min(8, os.cpu_count() or 1))
+    state.add_log(f"  ⚙️ Analiza jakości na {workers} wątkach...")
+    candidates: list[tuple[Path, AudioSegment, float]] = []
+    emotion_catalog = []
+    usable_files = 0
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="voice-import") as pool:
+        for index, (path, audio, score) in enumerate(pool.map(_load_import_candidate, audio_files), 1):
+            if audio is not None:
+                usable_files += 1
+                emotion_catalog.append({
+                    "file": str(path.resolve()),
+                    "emotion": _prosody_label(audio),
+                    "duration_sec": round(len(audio) / 1000.0, 3),
+                    "energy_dbfs": round(float(audio.dBFS), 2),
+                    "quality_score": round(float(score), 3),
+                })
+                candidates.append((path, audio, score))
+                # Bound RAM for huge datasets. Preserve energy diversity while
+                # retaining the best candidates seen so far.
+                if len(candidates) >= 512:
+                    by_energy = sorted(candidates, key=lambda item: float(item[1].dBFS))
+                    candidates = sorted(
+                        (item for bucket in (by_energy[i::4] for i in range(4)) for item in sorted(bucket, key=lambda x: x[2], reverse=True)[:64]),
+                        key=lambda item: item[0].name.lower(),
+                    )
+            if index % 250 == 0 or index == len(audio_files):
+                state.add_log(f"    ✓ sprawdzono {index}/{len(audio_files)} plików")
 
-    for audio_file in audio_files:
-        try:
-            audio = AudioSegment.from_file(audio_file)
-            audio = audio.set_channels(1).set_sample_width(2)
-
-            if not _is_usable_audio(audio):
-                state.add_log(
-                    f"  ⚠️ Pomijam słaby/cichy plik: {audio_file.name}"
-                )
-                continue
-
-            if len(combined) > 0:
-                combined += AudioSegment.silent(duration=120)
-
-            combined += audio
-            loaded_files += 1
-
-        except Exception as e:
-            state.add_log(f"  ⚠️ Nie udało się załadować {audio_file.name}: {e}")
+    loaded_files = usable_files
+    combined = _build_diverse_reference(candidates)
 
     if len(combined) < MIN_REF_DURATION_MS:
         state.add_log("❌ Za mało materiału audio po imporcie.")
@@ -1106,14 +1177,22 @@ def import_voice_from_folder(
 
     primary_embedding = embeddings[0] if embeddings else None
 
-    voice_id = create_voice_profile(
-        display_name=display_name,
-        source_movie=source_movie,
-        description=description,
-        audio_chunks=[combined],
-        embedding=primary_embedding,
-        embedding_samples=embeddings,
-    )
+    if existing_voice_id:
+        db = load_voice_db()
+        if existing_voice_id not in db:
+            state.add_log(f"❌ Profil do aktualizacji nie istnieje: {existing_voice_id}")
+            return ""
+        voice_id = _update_existing_voice_profile(existing_voice_id, combined, embeddings, loaded_files, db)
+        update_voice_metadata(voice_id, display_name, source_movie, description)
+    else:
+        voice_id = create_voice_profile(
+            display_name=display_name,
+            source_movie=source_movie,
+            description=description,
+            audio_chunks=[combined],
+            embedding=primary_embedding,
+            embedding_samples=embeddings,
+        )
 
     if embeddings:
         state.add_log(
@@ -1124,6 +1203,41 @@ def import_voice_from_folder(
         state.add_log(
             f"⚠️ Zaimportowano '{display_name}', ale ECAPA nie wygenerowało embeddingu."
         )
+
+    if voice_id:
+        db = load_voice_db()
+        info = db.get(voice_id)
+        if isinstance(info, dict):
+            emotion_dir = VOICE_DB_DIR / "emotions" / _safe_filename(voice_id)
+            emotion_dir.mkdir(parents=True, exist_ok=True)
+            emotion_refs = {}
+            emotion_counts = {
+                label: sum(item["emotion"] == label for item in emotion_catalog)
+                for label in ("neutral", "soft", "intense", "bright", "low_calm")
+            }
+            for label in ("neutral", "soft", "intense", "bright", "low_calm"):
+                group = [item for item in candidates if _prosody_label(item[1]) == label]
+                if not group:
+                    continue
+                emotion_audio = preprocess_reference_audio(_build_diverse_reference(group)[:15000])
+                if len(emotion_audio) < MIN_REF_DURATION_MS:
+                    continue
+                emotion_path = emotion_dir / f"{label}.wav"
+                emotion_audio.export(emotion_path, format="wav")
+                emotion_refs[label] = str(emotion_path)
+            catalog_path = emotion_dir / "catalog.jsonl"
+            catalog_path.write_text(
+                "".join(json.dumps(item, ensure_ascii=False) + "\n" for item in emotion_catalog),
+                encoding="utf-8",
+            )
+            info["sample_count"] = loaded_files
+            info["source_file_count"] = len(audio_files)
+            info["reference_strategy"] = "quality_emotion_diverse_v1"
+            info["reference_limit_sec"] = MAX_REF_DURATION_MS / 1000.0
+            info["emotion_references"] = emotion_refs
+            info["emotion_sample_counts"] = emotion_counts
+            info["emotion_catalog"] = str(catalog_path)
+            save_voice_db(db)
 
     return voice_id
 

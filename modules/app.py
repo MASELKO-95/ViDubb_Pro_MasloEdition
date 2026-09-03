@@ -28,15 +28,12 @@ except Exception:
 
 import requests
 from flask import Flask, Response, jsonify, render_template, request
-from modules.config import MAX_CONTENT_LENGTH, LANGUAGE_MAPPING
+from modules.config import APP_VERSION, MAX_CONTENT_LENGTH, LANGUAGE_MAPPING
 from modules.state import state
 from modules.routes.projects import projects_bp
 from modules.routes.video import video_bp
 from modules.routes.translate import translate_bp
 from modules.routes.dubbing import dubbing_bp
-
-APP_VERSION = "1.0.0-test"
-
 
 def _redact_diagnostic_text(value: str) -> str:
     text = str(value or "")
@@ -144,7 +141,10 @@ def create_app() -> Flask:
 
     @app.route("/api/ollama/logs")
     def api_ollama_logs():
-        since = int(request.args.get("since", 0))
+        try:
+            since = max(0, int(request.args.get("since", 0)))
+        except (TypeError, ValueError):
+            return jsonify({"error": "Parametr 'since' musi być liczbą całkowitą."}), 400
         return jsonify({
             "logs": state.get_logs(since=since),
             "total": state.get_total_logs()

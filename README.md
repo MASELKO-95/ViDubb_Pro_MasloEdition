@@ -1,6 +1,8 @@
 # 🎬 viDubb Pro — Maslo95 Edition
 
-**Version 1.0.0** | AI-Powered Video Dubbing & Translation Pipeline
+**Version 1.0.1a** | AI-Powered Video Dubbing & Translation Pipeline
+
+[![Tests](https://github.com/MASELKO-95/ViDubb_Pro_MasloEdition/actions/workflows/tests.yml/badge.svg)](https://github.com/MASELKO-95/ViDubb_Pro_MasloEdition/actions/workflows/tests.yml)
 
 > [!WARNING]
 > This is a test release under active development. Voice recognition,
@@ -168,6 +170,17 @@ If viDubb Pro is useful to you, you can support its development by
 [buying me a coffee](https://buycoffee.to/maslo_github). Thank you!
 
 ## 🐛 Testowanie i zgłaszanie błędów
+
+Lekkie testy, niewymagające pobierania modeli AI, można uruchomić lokalnie:
+
+```bash
+pip install -r requirements-test.txt
+pytest -q
+```
+
+GitHub Actions wykonuje te testy oraz kontrolę składni automatycznie po
+każdym pushu i dla każdego pull requestu. Workflow można też uruchomić
+ręcznie w zakładce **Actions → Tests → Run workflow**.
 
 - [GitHub Issues](https://github.com/MASELKO-95/ViDubb_Pro_MasloEdition/issues)
 - [GitHub Discussions](https://github.com/MASELKO-95/ViDubb_Pro_MasloEdition/discussions)

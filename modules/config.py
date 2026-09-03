@@ -5,7 +5,7 @@ Configuration constants for viDubb Pro — Maslo95 Edition
 import os
 
 APP_NAME = "viDubb Pro — Maslo95 Edition"
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1a"
 
 # Language Mapping from display name to ISO 639-1 code
 LANGUAGE_MAPPING = {
