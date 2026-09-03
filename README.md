@@ -1,40 +1,100 @@
 # 🎬 viDubb Pro — Maslo95 Edition
 
-**Version 1.0.1a** | AI-Powered Video Dubbing & Translation Pipeline
+**Version 1.0.1a** | Local AI-powered video dubbing, translation and voice-cloning pipeline
 
 [![Tests](https://github.com/MASELKO-95/ViDubb_Pro_MasloEdition/actions/workflows/tests.yml/badge.svg)](https://github.com/MASELKO-95/ViDubb_Pro_MasloEdition/actions/workflows/tests.yml)
 
 > [!WARNING]
-> This is a test release under active development. Voice recognition,
-> voice cloning, Timeline Review and Wav2Lip may still require manual review.
+> This is a test release under active development. Voice recognition, voice cloning, Timeline Review and Wav2Lip may still require manual review.
 
 Fork of [ViDubb](https://github.com/medahmedkrichen/ViDubb) by medahmedkrichen, enhanced and customized by [Maslo95](https://github.com/MASELKO-95).
 
-> This project processes media locally. Uploaded videos, generated audio,
-> projects and voice profiles are runtime data and are intentionally excluded
-> from the repository.
+> viDubb Pro processes media locally. Uploaded videos, generated audio, projects and voice profiles are runtime data and are intentionally excluded from the repository.
 
 ## ✨ Features
 
 - 🎤 **Voice Cloning** — XTTS-v2 zero-shot voice cloning for 17+ languages
-- 🗣️ **Speaker Diarization** — Automatic multi-speaker detection (SpeechBrain ECAPA-TDNN, local, no tokens)
-- 🌐 **AI Translation** — Local LLM translation via Ollama (no cloud APIs required)
-- 🔊 **Edge-TTS Fallback** — Microsoft Neural TTS as backup engine
-- 🎵 **Background Preservation** — Vocal/instrumental separation (UVR MDX-Net)
-- 📝 **Subtitle Editor** — Inline editing, approval workflow, ignore markers for intros/music
-- 🎬 **Lip Sync** — Wav2Lip integration for mouth movement synchronization
-- 🔇 **Smart Timing** — Timeline-based audio overlay (no more out-of-sync dubbing)
-- 🎛️ **Audio Enhancement** — DSP denoising, EQ, broadcast voice processing
-- 💻 **100% Local** — Everything runs on your machine, no API keys required
+- 🗣️ **Speaker Diarization** — automatic multi-speaker detection using SpeechBrain ECAPA-TDNN
+- 🌐 **AI Translation** — local LLM translation through Ollama
+- 🔊 **Edge-TTS Fallback** — Microsoft Neural TTS as a backup engine
+- 🎵 **Background Preservation** — vocal/instrumental separation with UVR MDX-Net
+- 📝 **Subtitle Editor** — inline editing, approval workflow and ignore markers
+- 🎬 **Lip Sync** — optional Wav2Lip integration
+- 🔇 **Smart Timing** — timeline-based audio overlay for better dubbing synchronization
+- 🎛️ **Audio Enhancement** — denoising, EQ and voice post-processing
+- 💻 **Local-first workflow** — no cloud API is required for the default pipeline
+
+## 🎥 Demo
+
+This section is intended to show the same clip before and after processing, making it easy to compare the result.
+
+| Version | Description | Demo file |
+|---|---|---|
+| 🎞️ **Original** | Original source clip before viDubb Pro processing | `docs/demo/original.mp4` |
+| 🇬🇧 **English dub** | Example generated English dubbing | `docs/demo/dub_english.mp4` |
+| 🇯🇵 **Japanese dub** | Example generated Japanese dubbing | `docs/demo/dub_japanese.mp4` |
+
+> The README structure is ready for the three demo videos. The MP4 files themselves must be added separately because screenshots of the desktop do not contain the actual video data.
+
+Recommended repository layout:
+
+```text
+docs/
+├── demo/
+│   ├── original.mp4
+│   ├── dub_english.mp4
+│   └── dub_japanese.mp4
+└── images/
+    └── launcher.png
+```
+
+For larger demo videos, GitHub Releases or an external video host is recommended instead of committing very large MP4 files directly to the repository.
+
+## 🖥️ GUI Preview
+
+### Launcher
+
+![viDubb Pro Launcher](docs/images/launcher.png)
+
+The launcher verifies dependencies, checks for updates and starts the local viDubb Pro server.
+
+### Main application
+
+The main web interface includes:
+
+- video and subtitle loading,
+- subtitle timeline editing,
+- speaker assignment,
+- source and target language selection,
+- Whisper model selection,
+- translation and approval workflow,
+- project management,
+- voice database access,
+- dubbing generation controls.
+
+### Dubbing panel
+
+The dubbing panel provides controls for:
+
+- target dubbing language,
+- dubbing or voice-over mode,
+- XTTS-v2 or fallback TTS engines,
+- reference voice selection,
+- background-audio preservation,
+- optional burned-in subtitles,
+- optional Wav2Lip synchronization,
+- audio enhancement,
+- output path,
+- Timeline Review before rendering.
 
 ## 🚀 Quick Start
 
 ### Requirements
 
-- Python 3.10 (recommended; some AI dependencies may not support newer versions)
-- CUDA-compatible GPU (recommended, 8GB+ VRAM)
-- FFmpeg installed and on PATH
-- [Ollama](https://ollama.com/) with a translation model (for local AI translation)
+- Python 3.10 recommended
+- CUDA-compatible GPU recommended, ideally 8 GB+ VRAM
+- FFmpeg installed and available on `PATH`
+- [Ollama](https://ollama.com/) with a translation model for local AI translation
 
 ### Installation
 
@@ -42,7 +102,7 @@ Fork of [ViDubb](https://github.com/medahmedkrichen/ViDubb) by medahmedkrichen, 
 git clone https://github.com/MASELKO-95/ViDubb_Pro_MasloEdition.git
 cd ViDubb_Pro_MasloEdition
 python -m venv .venv
-source .venv/bin/activate  # Linux/Mac
+source .venv/bin/activate  # Linux/macOS
 # Windows PowerShell: .venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 pip install -r requirements.txt
@@ -50,33 +110,33 @@ pip install -r requirements.txt
 
 ### Running
 
-**Option 1: GUI Launcher (recommended)**
+**Option 1: GUI Launcher — recommended**
+
 ```bash
 python run_launcher.py
 ```
 
 **Option 2: Direct Flask server**
+
 ```bash
 python app_new.py
 ```
 
 Open `http://127.0.0.1:7860` in your browser.
 
-The first run may download several AI models. Model weights, virtual
-environments and generated media are not included in Git.
+The first run may download several AI models. Model weights, virtual environments and generated media are not included in Git.
 
-### Czyszczenie cache
+## 🧹 Cache cleanup
 
-Skrypt usuwa `__pycache__`, pliki `.pyc/.pyo` oraz cache narzędzi. Nie usuwa
-`.venv`, projektów, filmów ani bazy głosów:
+The cleanup script removes `__pycache__`, `.pyc/.pyo` files and tool caches. It does not remove `.venv`, projects, videos or the voice database.
 
 ```bash
 python scripts/clean_cache.py
 ```
 
-### Publikacja zmian na GitHubie
+## 📦 Publishing changes to GitHub
 
-Przed wysłaniem sprawdź listę zmian, a następnie wykonaj:
+Before pushing changes:
 
 ```bash
 python scripts/clean_cache.py
@@ -86,75 +146,93 @@ git commit -m "Prepare project for public release"
 git push origin main
 ```
 
-### Kreator bazy głosów
+## 🎙️ Voice Dataset Builder
 
-Osobny program tnie długie audio/wideo na dialogi, transkrybuje je, porównuje
-głos z pewną próbką ECAPA i kataloguje wyniki jako `accepted`, `review` oraz
-`rejected`:
+The separate dataset builder can split long audio/video recordings into dialogue clips, transcribe them, compare voices using ECAPA and classify clips into `accepted`, `review` and `rejected` groups.
+
+GUI mode:
 
 ```bash
 python tools/voice_dataset_builder.py --gui
 ```
 
-Wersja terminalowa:
+Terminal mode:
 
 ```bash
-python tools/voice_dataset_builder.py nagranie1.mp4 nagranie2.wav \
-  --name Yuuki_Takada --reference pewna_probka.wav --language ja --register
+python tools/voice_dataset_builder.py recording1.mp4 recording2.wav \
+  --name Yuuki_Takada --reference reference_sample.wav --language ja --register
 ```
 
-Dataset trafia do `voice_datasets/<nazwa>/`. Kolejne uruchomienia dopisują
-klipy do istniejącego manifestu. `--register` tworzy także kompatybilny profil
-w obecnej Voice DB. Bez pliku referencyjnego lub `--voice-id` program celowo
-kieruje klipy do `review`, ponieważ nie ma podstaw do potwierdzenia osoby.
+Datasets are stored in `voice_datasets/<name>/`. Re-running the tool appends clips to the existing manifest. `--register` also creates a compatible profile in the current Voice DB. Without a reference file or `--voice-id`, clips are intentionally routed to `review` because the speaker identity cannot be confirmed reliably.
 
-`voice_db/` and `speakers_audio/` start empty after cloning. The application
-creates the voice database index automatically when it is first needed.
+`voice_db/` and `speakers_audio/` start empty after cloning. The application creates the voice database index automatically when first needed.
 
-### Wav2Lip Setup (optional, for lip sync)
+## 👄 Wav2Lip Setup — optional
 
-Download `wav2lip_gan.pth` and place it in `Wav2Lip/checkpoints/`:
-- [Wav2Lip Weights](https://github.com/Rudrabha/Wav2Lip#getting-the-weights)
+Download `wav2lip_gan.pth` and place it in:
+
+```text
+Wav2Lip/checkpoints/
+```
+
+See the [Wav2Lip project](https://github.com/Rudrabha/Wav2Lip#getting-the-weights) for the model weights.
 
 ## 🏗️ Architecture
 
-```
+```text
 viDubb Pro/
-├── app_new.py                    # Flask server entry point
-├── run_launcher.py               # Tkinter GUI launcher
+├── app_new.py                     # Flask server entry point
+├── run_launcher.py                # Tkinter GUI launcher
 ├── modules/
-│   ├── app.py                    # Flask app factory
-│   ├── config.py                 # Configuration constants
-│   ├── state.py                  # Global state manager
+│   ├── app.py                     # Flask app factory
+│   ├── config.py                  # Configuration constants
+│   ├── state.py                   # Global state manager
 │   ├── routes/
-│   │   ├── dubbing.py            # Dubbing generation API
-│   │   ├── projects.py           # Project CRUD
-│   │   ├── translate.py          # AI translation (Ollama/OpenAI)
-│   │   └── video.py              # Video upload, transcription, diarization
+│   │   ├── dubbing.py             # Dubbing generation API
+│   │   ├── projects.py            # Project CRUD
+│   │   ├── translate.py           # AI translation
+│   │   └── video.py               # Video upload, transcription, diarization
 │   ├── services/
-│   │   ├── audio_enhancer.py     # Audio post-processing
-│   │   ├── diarization_service.py# Speaker identification
-│   │   ├── tts_service.py        # XTTS-v2 & Edge-TTS synthesis
-│   │   ├── video_service.py      # Background separation & video muxing
-│   │   └── whisper_service.py    # Faster-Whisper transcription
-│   └── utils/                    # Time formatting, cleanup utilities
-├── Wav2Lip/                      # Lip sync engine
-├── templates/index.html          # Web UI (single-page app)
-└── static/                       # CSS, fonts, assets
+│   │   ├── audio_enhancer.py      # Audio post-processing
+│   │   ├── diarization_service.py # Speaker identification
+│   │   ├── tts_service.py         # XTTS-v2 and Edge-TTS synthesis
+│   │   ├── video_service.py       # Background separation and video muxing
+│   │   └── whisper_service.py     # Faster-Whisper transcription
+│   └── utils/                     # Time formatting and cleanup utilities
+├── Wav2Lip/                       # Lip-sync engine
+├── templates/index.html           # Web UI
+└── static/                        # CSS, fonts and assets
 ```
 
 ## 🌍 Supported Languages
 
-English, Polish, Spanish, French, German, Italian, Turkish, Russian, Dutch, Czech, Arabic, Chinese (Simplified), Japanese, Korean, Hindi
+English, Polish, Spanish, French, German, Italian, Turkish, Russian, Dutch, Czech, Arabic, Chinese (Simplified), Japanese, Korean and Hindi.
 
 ## 🔧 Configuration
 
 | Setting | Default | Description |
-|---------|---------|-------------|
+|---|---|---|
 | TTS Engine | Edge-TTS | `edge` or `xtts` for voice cloning |
-| Translation | Ollama | Local LLM, configurable endpoint |
+| Translation | Ollama | Local LLM with configurable endpoint |
 | Whisper Model | `turbo` | `tiny`, `base`, `small`, `medium`, `large-v3`, `turbo` |
-| Audio Enhancement | Off | DSP denoising, broadcast voice |
+| Audio Enhancement | Off | DSP denoising and voice processing |
+
+## 🧪 Testing and bug reports
+
+Lightweight tests that do not require downloading AI models can be run locally:
+
+```bash
+pip install -r requirements-test.txt
+pytest -q
+```
+
+GitHub Actions runs the tests and syntax checks automatically on each push and pull request. The workflow can also be started manually from **Actions → Tests → Run workflow**.
+
+- [GitHub Issues](https://github.com/MASELKO-95/ViDubb_Pro_MasloEdition/issues)
+- [GitHub Discussions](https://github.com/MASELKO-95/ViDubb_Pro_MasloEdition/discussions)
+- Discord: **Lone wolf® (formerly MASELKO-95®)**, username `maselko95`
+
+The `🧪 TEST` button in the application can export a diagnostic report containing recent logs. Before saving, the report masks tokens and the local home-directory path. Attach the report to a bug report together with the steps performed and the expected result.
 
 ## 📜 Credits
 
@@ -166,30 +244,7 @@ English, Polish, Spanish, French, German, Italian, Turkish, Russian, Dutch, Czec
 
 ## ☕ Support
 
-If viDubb Pro is useful to you, you can support its development by
-[buying me a coffee](https://buycoffee.to/maslo_github). Thank you!
-
-## 🐛 Testowanie i zgłaszanie błędów
-
-Lekkie testy, niewymagające pobierania modeli AI, można uruchomić lokalnie:
-
-```bash
-pip install -r requirements-test.txt
-pytest -q
-```
-
-GitHub Actions wykonuje te testy oraz kontrolę składni automatycznie po
-każdym pushu i dla każdego pull requestu. Workflow można też uruchomić
-ręcznie w zakładce **Actions → Tests → Run workflow**.
-
-- [GitHub Issues](https://github.com/MASELKO-95/ViDubb_Pro_MasloEdition/issues)
-- [GitHub Discussions](https://github.com/MASELKO-95/ViDubb_Pro_MasloEdition/discussions)
-- Discord: **Lone wolf® (dawniej MASELKO-95®)**, nazwa użytkownika `maselko95`
-
-Przycisk `🧪 TEST` w aplikacji pozwala pobrać raport diagnostyczny z ostatnimi
-logami. Przed zapisaniem raport maskuje tokeny i lokalną ścieżkę katalogu
-domowego. Dołącz raport do zgłoszenia, opisując wykonane kroki i oczekiwany
-rezultat.
+If viDubb Pro is useful to you, you can support its development by [buying me a coffee](https://buycoffee.to/maslo_github).
 
 ## 📄 License
 
