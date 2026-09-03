@@ -1,3 +1,10 @@
+<p align="center">
+
+[![Downloads](https://img.shields.io/github/downloads/MASELKO-95/ViDubb_Pro_MasloEdition/total?style=for-the-badge&logo=github&label=Downloads)](https://github.com/MASELKO-95/ViDubb_Pro_MasloEdition/releases)
+
+[![Visitors](https://hits.sh/github.com/MASELKO-95/ViDubb_Pro_MasloEdition.svg?style=for-the-badge&label=Visitors&logo=github)](https://hits.sh/github.com/MASELKO-95/ViDubb_Pro_MasloEdition/)
+
+</p>
 # 🎬 viDubb Pro — Maslo95 Edition
 
 **Version 1.0.1a** | AI-Powered Video Dubbing, Translation & Voice Cloning Pipeline
