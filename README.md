@@ -30,15 +30,18 @@ Fork of [ViDubb](https://github.com/medahmedkrichen/ViDubb) by medahmedkrichen, 
 
 ### Launcher
 
-![viDubb Pro Launcher](docs/images/launcher.png)
+![viDubb Pro Launcher](<img width="709" height="553" alt="7c0c5236-5df7-4dc6-8bc2-24137bc8e059" src="https://github.com/user-attachments/assets/4fc27977-4203-4ef7-9183-c893c3b36582" />
+)
 
 ### Main Interface
 
-![viDubb Pro Main Interface](docs/images/gui-main.png)
+![viDubb Pro Main Interface](<img width="1896" height="896" alt="6f2cdaee-1c81-4fab-ad29-4163561bc3d5" src="https://github.com/user-attachments/assets/925365c3-3ebe-4086-aa8a-bc242989bddc" />
+)
 
 ### Dubbing Panel
 
-![viDubb Pro Dubbing Panel](docs/images/dubbing-panel.png)
+![viDubb Pro Dubbing Panel](<img width="316" height="745" alt="5cbb939b-8e88-4d6b-ac50-26c589b72790" src="https://github.com/user-attachments/assets/58141e3f-774c-4e51-867c-3cd4e83fb07e" />
+)
 
 Recommended structure:
 
