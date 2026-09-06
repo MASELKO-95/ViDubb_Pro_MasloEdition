@@ -52,7 +52,9 @@ Original source video before translation and dubbing.
 
 English translation and AI-generated dubbing created with viDubb Pro.
 
-[▶ **Watch / Download English Dub**](https://github.com/MASELKO-95/ViDubb_Pro_MasloEdition/releases/download/Media/dub_english.mp4)
+https://github.com/user-attachments/assets/7f88cb1f-d7f9-44e3-9ed8-e5bae0a5d814
+
+[▶ **Watch Full / Download English Dub**](https://github.com/MASELKO-95/ViDubb_Pro_MasloEdition/releases/download/Media/dub_english.mp4)
 
 ---
 
@@ -60,7 +62,11 @@ English translation and AI-generated dubbing created with viDubb Pro.
 
 Japanese translation and AI-generated dubbing created with viDubb Pro.
 
-[▶ **Watch / Download Japanese Dub**](https://github.com/MASELKO-95/ViDubb_Pro_MasloEdition/releases/download/Media/dub_japanese.mp4)
+
+https://github.com/user-attachments/assets/fd955c7d-5f38-4c8b-8906-00dc9c90f26c
+
+
+[▶ **Watch Full / Download Japanese Dub**](https://github.com/MASELKO-95/ViDubb_Pro_MasloEdition/releases/download/Media/dub_japanese.mp4)
 
 ---
 
