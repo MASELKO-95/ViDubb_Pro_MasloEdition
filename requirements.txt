@@ -28,7 +28,7 @@ scikit-image
 # ML/Utils
 numpy==1.26.4
 scipy==1.11.4
-transformers==4.36.2
+transformers==5.10.1
 torch>=2.6.0
 torchaudio>=2.6.0
 torchvision>=0.21.0
